@@ -2,9 +2,8 @@
 import time
 import network
 
+from secrets import WIFI_SSID, WIFI_PASSWORD
 from config import (
-    WIFI_SSID,
-    WIFI_PASSWORD,
     WIFI_CONNECT_TIMEOUT,
     WIFI_RETRY_DELAY,
 )
