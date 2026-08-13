@@ -1,3 +1,7 @@
 # Copy to secrets.py (gitignored) and fill in. Upload secrets.py to the device.
-WIFI_SSID = "your-ssid"
-WIFI_PASSWORD = "your-password"
+# Order does not matter: the strongest network in range wins.
+WIFI_NETWORKS = [
+    ("Wifi-1", "room-password"),
+    ("Wifi-2", "guest-password"),
+    ("Wifi-3", "office-password"),
+]
