@@ -1,8 +1,10 @@
 import time
 
+import config
 from wifi import wifi
 from display import display
 from ping import ping
+from ntfy import NtfyStream
 
 
 PING_HOST = "1.1.1.1"
@@ -29,6 +31,35 @@ def get_wifi_info():
         rssi = None
 
     return ip, rssi
+
+
+def draw_normal():
+    """Repaint the standard network screen (also used after a message clears)."""
+
+    display.clear()
+    display.show_header()
+
+    if wifi.is_connected():
+        ip, rssi = get_wifi_info()
+
+        display.show_wifi(
+            ssid=wifi.get_ssid(),
+            ip=ip,
+            status=True,
+            rssi=rssi,
+        )
+    else:
+        display.show_wifi(
+            ssid=wifi.get_ssid(),
+            ip="--",
+            status=False,
+        )
+
+    if ping_result is not None:
+        display.show_ping(ping_result)
+
+
+ping_result = None
 
 
 # ----------------------------------------------------------------------
@@ -59,33 +90,11 @@ else:
 # Initial Wi-Fi display
 # ----------------------------------------------------------------------
 
+draw_normal()
+
 if wifi.is_connected():
-
-    ip, rssi = get_wifi_info()
-
-    display.clear()
-    display.show_header()
-
-    display.show_wifi(
-        ssid=wifi.get_ssid(),
-        ip=ip,
-        status=True,
-        rssi=rssi,
-    )
-
     print("[Display] WiFi information displayed")
-
 else:
-
-    display.clear()
-    display.show_header()
-
-    display.show_wifi(
-        ssid=wifi.get_ssid(),
-        ip="--",
-        status=False,
-    )
-
     print("[Display] Network unavailable")
 
 
@@ -122,6 +131,11 @@ next_animation = now
 
 animation_frame = 0
 
+ntfy = NtfyStream(config.NTFY_HOST, config.NTFY_TOPIC)
+
+# When set, a message is on screen until this tick.
+message_until = None
+
 
 # ----------------------------------------------------------------------
 # Main loop
@@ -132,6 +146,33 @@ last_displayed_second = -1
 while True:
 
     now = time.ticks_ms()
+
+    # --------------------------------------------------------------
+    # ntfy stream
+    # --------------------------------------------------------------
+
+    message = ntfy.poll()
+
+    if message:
+        print("[Hermes]", message)
+
+        display.show_message(message)
+
+        message_until = time.ticks_add(now, config.NTFY_MESSAGE_MS)
+
+    if message_until is not None:
+
+        if time.ticks_diff(now, message_until) < 0:
+            # Message owns the screen; nothing else may draw.
+            time.sleep_ms(20)
+            continue
+
+        message_until = None
+
+        draw_normal()
+
+        last_displayed_second = -1
+        next_animation = now
 
     # --------------------------------------------------------------
     # Persistent animation
