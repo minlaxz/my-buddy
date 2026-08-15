@@ -27,11 +27,13 @@ class NtfyStream:
         use_ssl=True,
         idle_timeout_ms=90_000,
         retry_ms=5_000,
+        token=None,
     ):
         self.host = host
         self.topic = topic
         self.port = port
         self.use_ssl = use_ssl
+        self.token = token
         # ntfy sends a keepalive event every ~45s; longer silence means dead link.
         self.idle_timeout_ms = idle_timeout_ms
         self.retry_ms = retry_ms
@@ -63,12 +65,19 @@ class NtfyStream:
         if self.use_ssl:
             sock = ssl.wrap_socket(sock, server_hostname=self.host)
 
+        # Cloudflare answers 1010 and blocks the request outright without a
+        # recognised User-Agent.
         request = (
             "GET /{}/json HTTP/1.0\r\n"
             "Host: {}\r\n"
+            "User-Agent: curl/8.7.1\r\n"
             "Accept: application/x-ndjson\r\n"
-            "\r\n"
         ).format(self.topic, self.host)
+
+        if self.token:
+            request += "Authorization: Bearer {}\r\n".format(self.token)
+
+        request += "\r\n"
 
         sock.write(request.encode())
         sock.setblocking(False)
