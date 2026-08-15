@@ -1,6 +1,7 @@
 import time
 
 import config
+import secrets
 from wifi import wifi
 from display import display
 from ping import ping
@@ -131,7 +132,11 @@ next_animation = now
 
 animation_frame = 0
 
-ntfy = NtfyStream(config.NTFY_HOST, config.NTFY_TOPIC)
+ntfy = NtfyStream(
+    config.NTFY_HOST,
+    config.NTFY_TOPIC,
+    token=getattr(secrets, "NTFY_TOKEN", None),
+)
 
 # When set, a message is on screen until this tick.
 message_until = None

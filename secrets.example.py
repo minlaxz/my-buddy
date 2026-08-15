@@ -5,3 +5,7 @@ WIFI_NETWORKS = [
     ("Wifi-2", "guest-password"),
     ("Wifi-3", "office-password"),
 ]
+
+# ntfy access token. "" means subscribe anonymously (only works if the server
+# allows read access to the topic without auth).
+NTFY_TOKEN = "tk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
