@@ -13,6 +13,17 @@ TFT_RST = 10
 TFT_WIDTH = 240
 TFT_HEIGHT = 240
 
+# Claude state shares the header row, to the right of the "HERMES" label.
+STATUS_X = 64
+
+
+STATE_COLORS = {
+    "working": st7789.YELLOW,
+    "idle": st7789.GREEN,
+    "needs you": st7789.RED,
+    "sleeping": st7789.BLUE,
+}
+
 
 def wrap(text, width):
     """Split text into lines of at most `width` chars, keeping existing breaks."""
@@ -83,13 +94,36 @@ class Display:
 
     def show_header(self):
         self.text(
-            "HERMES ESP32-S3",
+            "HERMES",
             4,
             4,
             st7789.CYAN,
         )
 
         self.line(16, st7789.WHITE)
+
+    def show_status(self, state):
+        """
+        Persistent agent state, right of the header. Redraws only its own strip.
+        """
+
+        self.tft.fill_rect(
+            STATUS_X,
+            0,
+            TFT_WIDTH - STATUS_X,
+            14,
+            st7789.BLACK,
+        )
+
+        if not state:
+            return
+
+        self.text(
+            str(state).upper()[:21],
+            STATUS_X,
+            4,
+            STATE_COLORS.get(str(state).lower(), st7789.WHITE),
+        )
 
     def show_wifi(self, ssid, ip, status, rssi=None):
         self.text("WiFi", 4, 28, st7789.CYAN)

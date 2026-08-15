@@ -86,7 +86,7 @@ class NtfyStream:
         self.last_rx = time.ticks_ms()
 
     def poll(self):
-        """Return the newest message text, or None. Never blocks."""
+        """Return the newest (title, message), or None. Never blocks."""
 
         if self.sock is None:
             # ponytail: connect() blocks for the DNS+TCP+TLS handshake, so the
@@ -167,7 +167,7 @@ class NtfyStream:
                 continue
 
             if event.get("event") == "message":
-                message = event.get("message", "")
+                message = (event.get("title"), event.get("message", ""))
 
         # Guard against a runaway line with no newline eating all the RAM.
         if len(self.buf) > 4096:

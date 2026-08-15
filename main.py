@@ -39,6 +39,7 @@ def draw_normal():
 
     display.clear()
     display.show_header()
+    display.show_status(claude_state)
 
     if wifi.is_connected():
         ip, rssi = get_wifi_info()
@@ -61,6 +62,9 @@ def draw_normal():
 
 
 ping_result = None
+
+# Sticky agent state shown in the header; survives message popups.
+claude_state = None
 
 
 # ----------------------------------------------------------------------
@@ -156,14 +160,26 @@ while True:
     # ntfy stream
     # --------------------------------------------------------------
 
-    message = ntfy.poll()
+    event = ntfy.poll()
 
-    if message:
-        print("[Hermes]", message)
+    if event:
+        title, message = event
 
-        display.show_message(message)
+        if title == "state":
+            # Sticky: updates the header, never takes over the screen.
+            claude_state = message
 
-        message_until = time.ticks_add(now, config.NTFY_MESSAGE_MS)
+            print("[state]", claude_state)
+
+            if message_until is None:
+                display.show_status(claude_state)
+
+        else:
+            print("[Hermes]", message)
+
+            display.show_message(message)
+
+            message_until = time.ticks_add(now, config.NTFY_MESSAGE_MS)
 
     if message_until is not None:
 
