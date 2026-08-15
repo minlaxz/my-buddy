@@ -14,6 +14,26 @@ TFT_WIDTH = 240
 TFT_HEIGHT = 240
 
 
+def wrap(text, width):
+    """Split text into lines of at most `width` chars, keeping existing breaks."""
+
+    lines = []
+
+    for paragraph in text.split("\n"):
+        while len(paragraph) > width:
+            cut = paragraph.rfind(" ", 0, width + 1)
+
+            if cut <= 0:
+                cut = width
+
+            lines.append(paragraph[:cut])
+            paragraph = paragraph[cut:].lstrip()
+
+        lines.append(paragraph)
+
+    return lines
+
+
 class Display:
     def __init__(self):
         # KEEP THE KNOWN-GOOD CONFIGURATION.
@@ -266,6 +286,25 @@ class Display:
             88,
             208,
         )
+
+    def show_message(self, text, title="HERMES MESSAGE"):
+        """
+        Full-screen takeover for an incoming ntfy message.
+        """
+
+        self.clear()
+
+        self.text(title, 4, 4, st7789.YELLOW)
+        self.line(16, st7789.WHITE)
+
+        y = 28
+
+        for line in wrap(str(text), 29):
+            if y > 230:
+                break
+
+            self.text(line, 4, y)
+            y += 12
 
     def show_animation(self, frame):
         """
