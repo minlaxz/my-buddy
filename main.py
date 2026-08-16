@@ -6,6 +6,7 @@ from wifi import wifi
 from display import display
 from ping import ping
 from ntfy import NtfyStream
+from beacon import beacon
 
 
 PING_HOST = "1.1.1.1"
@@ -13,6 +14,10 @@ PING_HOST = "1.1.1.1"
 PING_INTERVAL_MS = 60_000
 
 ANIMATION_INTERVAL_MS = 100
+
+# ntfy reconnects routinely (~5s backoff). Only a link down longer than this is
+# a dead link, and a Beacon still asserting the last state would be lying.
+NTFY_STALE_MS = 15_000
 
 
 def log(message, line):
@@ -61,10 +66,28 @@ def draw_normal():
         display.show_ping(ping_result)
 
 
+def set_state(state):
+    """Drive both surfaces that show a Status: the header and the Beacon.
+
+    The Beacon always follows; the header waits if a message owns the screen.
+    """
+
+    beacon.show(state)
+
+    if message_until is None:
+        display.show_status(state)
+
+
 ping_result = None
 
 # Sticky agent state shown in the header; survives message popups.
 claude_state = None
+
+# Tick the ntfy socket went away, or None while connected.
+ntfy_down_since = None
+
+# True once a dead link has blanked the Beacon, so it blanks once, not per tick.
+beacon_stale = False
 
 
 # ----------------------------------------------------------------------
@@ -166,13 +189,13 @@ while True:
         title, message = event
 
         if title == "state":
-            # Sticky: updates the header, never takes over the screen.
+            # Sticky: updates the header and the Beacon, never takes over the
+            # screen.
             claude_state = message
 
             print("[state]", claude_state)
 
-            if message_until is None:
-                display.show_status(claude_state)
+            set_state(claude_state)
 
         else:
             print("[Hermes]", message)
@@ -180,6 +203,35 @@ while True:
             display.show_message(message)
 
             message_until = time.ticks_add(now, config.NTFY_MESSAGE_MS)
+
+    # --------------------------------------------------------------
+    # Beacon truthfulness: a dead stream means the state is stale
+    # --------------------------------------------------------------
+
+    if ntfy.sock is None:
+
+        if ntfy_down_since is None:
+            ntfy_down_since = now
+
+        elif not beacon_stale and time.ticks_diff(now, ntfy_down_since) > NTFY_STALE_MS:
+            # Dark says "I don't know"; the last colour would say something false.
+            beacon.off()
+            beacon_stale = True
+
+    else:
+
+        if ntfy_down_since is not None:
+            ntfy_down_since = None
+
+        if beacon_stale:
+            beacon_stale = False
+            beacon.show(claude_state)
+
+    # ponytail: ticked every pass, not on the 100ms animation timer — that timer
+    # sits after the message popup's `continue`, which would freeze the breathe
+    # for 5s exactly when "needs you" is pulsing. tick() only writes the pixel
+    # when the level actually changes, so the extra passes are arithmetic.
+    beacon.tick(now)
 
     if message_until is not None:
 
