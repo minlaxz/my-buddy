@@ -35,5 +35,9 @@ _Avoid_: alert, message, interrupt
 A persistent one-line indicator of a Sender's current state, drawn in the header beside the Hermes label. Unlike a Notification it never interrupts the Page and never times out — it stays until the Sender replaces it, and survives a Notification passing over it. Colour carries the meaning; the text names the state.
 _Avoid_: status bar, banner, indicator
 
+**Beacon**:
+The onboard RGB LED, showing the current Status as colour alone — the same states and the same hues as the header, with no text. It is a second rendering of Status, not a thing of its own: nothing can set the Beacon that could not set the Status. Visible from across the room and while the Terminal faces away, so it answers "is Claude working?" without reading the Page. Dark means the Terminal has no Status to show — at boot, after a Sender sleeps, or when the stream has been down long enough that the last state can no longer be trusted.
+_Avoid_: LED, light, RGB (those name the part, not the role)
+
 **Sticky**:
 A Notification flagged as must-see. It stays on screen until acknowledged rather than timing out. Acknowledgement hardware may not exist yet; the flag exists in the protocol from day one. Phase 2 — a Status is not a Sticky, since nothing acknowledges it.
