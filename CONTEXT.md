@@ -1,6 +1,6 @@
 # Buddy
 
-A physical ESP32-S3 + 240x240 TFT unit on the owner's desk. Today it does one thing: shows which Wi-Fi network it is on, its address and signal strength. Anything beyond that is not yet decided and not in this glossary.
+A physical ESP32-S3 + 240x240 TFT unit on the owner's desk. Today it shows which Wi-Fi network it is on, its address and signal strength, and any Message the owner pushes to it over the LAN. Anything beyond that is not yet decided and not in this glossary.
 
 ## Language
 
@@ -22,6 +22,10 @@ _Avoid_: screen, dashboard, view
 **Wi-Fi Link**:
 What the one Page shows: the SSID the Terminal is joined to, its IP and its RSSI. When the Terminal is not joined to any known network the Page says so instead, and the Terminal keeps trying to join.
 _Avoid_: connection status, network info
+
+**Message**:
+Text the owner pushes to the Terminal over its LAN control page. Drawn on the Page under the Wi-Fi Link and stays there until replaced or cleared; it never interrupts anything and never times out.
+_Avoid_: notification (the old interrupting, timed thing), alert, popup
 
 **Heartbeat**:
 The row of dots at the bottom of the Page with one dot hopping along it. Says only that the firmware loop is alive; carries no data. If it stops, the Terminal is hung.

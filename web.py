@@ -6,21 +6,67 @@ import machine
 
 PORT = 80
 
-# ponytail: one read per request. Requests are a line and a few headers;
-# nothing here accepts a body. Bump when a route needs POST data.
-REQUEST_BYTES = 1024
+# ponytail: whole request must fit here — a line, a few headers, a short form
+# body. /message caps at 200 chars in the page; curl can send more and gets
+# truncated.
+REQUEST_BYTES = 1536
+
+
+def unquote(s):
+    """Decode application/x-www-form-urlencoded text."""
+
+    s = s.replace("+", " ")
+    parts = s.split("%")
+    out = parts[0]
+
+    for part in parts[1:]:
+        try:
+            out += chr(int(part[:2], 16)) + part[2:]
+        except ValueError:
+            out += "%" + part
+
+    return out
+
+
+def parse_form(s):
+    """{key: value} from a query string or form body."""
+
+    form = {}
+
+    for pair in s.split("&"):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            form[unquote(k)] = unquote(v)
+
+    return form
 
 
 def parse_request(data):
-    """(method, path) from the raw request bytes, or (None, None)."""
+    """(method, path, form) from raw request bytes; form merges query + body."""
 
     try:
-        line = data.split(b"\r\n", 1)[0].decode()
+        head, _, body = data.partition(b"\r\n\r\n")
+        line = head.split(b"\r\n", 1)[0].decode()
         method, target, _version = line.split(" ", 2)
     except (ValueError, UnicodeError):
-        return None, None
+        return None, None, {}
 
-    return method, target.split("?", 1)[0]
+    path, _, query = target.partition("?")
+
+    form = parse_form(query)
+    form.update(parse_form(body.decode()))
+
+    return method, path, form
+
+
+def content_length(data):
+    for line in data.split(b"\r\n"):
+        if line.lower().startswith(b"content-length:"):
+            try:
+                return int(line.split(b":", 1)[1])
+            except ValueError:
+                return 0
+    return 0
 
 
 def page(status):
@@ -36,6 +82,8 @@ def page(status):
     return (
         "<!doctype html><title>Buddy</title>"
         "<h1>Buddy</h1><p>{}</p><p>Uptime: {} s</p>"
+        "<form method=post action=/message>"
+        "<input name=text maxlength=200 autofocus> <button>Show</button></form>"
         "<form method=post action=/reboot><button>Reboot</button></form>"
     ).format(rows, status.get("uptime_s"))
 
@@ -57,9 +105,11 @@ def json_status(status):
 class WebServer:
     """Tiny HTTP/1.0 server polled from the main loop. One request per poll."""
 
-    def __init__(self, status):
+    def __init__(self, status, on_message):
         # status: callable returning {"link": (ssid, ip, rssi) | None, "uptime_s": int}
+        # on_message: callable(text) that puts a Message on the Page
         self.status = status
+        self.on_message = on_message
         self.reboot_pending = False
 
         self.sock = socket.socket()
@@ -76,8 +126,20 @@ class WebServer:
 
         try:
             client.settimeout(0.5)
-            method, path = parse_request(client.recv(REQUEST_BYTES))
-            code, ctype, body = self.route(method, path)
+            data = client.recv(REQUEST_BYTES)
+
+            # Body may trail the headers in a second segment (browser forms).
+            head, sep, body = data.partition(b"\r\n\r\n")
+            want = content_length(head) if sep else 0
+            while len(body) < want and len(data) < REQUEST_BYTES:
+                more = client.recv(REQUEST_BYTES - len(data))
+                if not more:
+                    break
+                data += more
+                body += more
+
+            method, path, form = parse_request(data)
+            code, ctype, body = self.route(method, path, form)
             body = body.encode()
             client.send(
                 "HTTP/1.0 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n"
@@ -95,12 +157,18 @@ class WebServer:
             time.sleep_ms(200)
             machine.reset()
 
-    def route(self, method, path):
+    def route(self, method, path, form):
         if method == "GET" and path == "/":
             return "200 OK", "text/html", page(self.status())
 
         if method == "GET" and path == "/status":
             return "200 OK", "application/json", json_status(self.status())
+
+        if method == "POST" and path == "/message":
+            text = form.get("text", "")
+            print("[Web] Message:", repr(text))
+            self.on_message(text)
+            return "200 OK", "text/plain", "Shown" if text else "Cleared"
 
         if method == "POST" and path == "/reboot":
             # Answer first, reset after the socket is closed.

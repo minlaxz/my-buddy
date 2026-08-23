@@ -17,6 +17,31 @@ TFT_HEIGHT = 240
 LINE_1_Y = 36
 LINE_2_Y = 56
 
+# Message area: below the Wi-Fi lines, above the Heartbeat.
+MESSAGE_Y = 84
+MESSAGE_ROWS = 7
+MESSAGE_COLS = 29
+
+
+def wrap(text, width):
+    """Split text into lines of at most `width` chars, keeping existing breaks."""
+
+    lines = []
+
+    for paragraph in text.split("\n"):
+        while len(paragraph) > width:
+            cut = paragraph.rfind(" ", 0, width + 1)
+
+            if cut <= 0:
+                cut = width
+
+            lines.append(paragraph[:cut])
+            paragraph = paragraph[cut:].lstrip()
+
+        lines.append(paragraph)
+
+    return lines
+
 
 def link_lines(link):
     """The two Page lines for a Wi-Fi Link, or for no link at all.
@@ -114,6 +139,20 @@ class Display:
 
         if line2 is not None:
             self.text(line2, 4, LINE_2_Y)
+
+    def show_message(self, text):
+        """Draw a Message below the Wi-Fi lines. Empty text clears the area."""
+
+        self.tft.fill_rect(
+            0,
+            MESSAGE_Y,
+            TFT_WIDTH,
+            MESSAGE_ROWS * font.HEIGHT,
+            st7789.BLACK,
+        )
+
+        for i, line in enumerate(wrap(str(text), MESSAGE_COLS)[:MESSAGE_ROWS]):
+            self.text(line, 4, MESSAGE_Y + i * font.HEIGHT, st7789.YELLOW)
 
     def show_animation(self, frame):
         """

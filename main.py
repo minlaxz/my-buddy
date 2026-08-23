@@ -85,7 +85,7 @@ def status():
     }
 
 
-web = WebServer(status)
+web = WebServer(status, display.show_message)
 
 if shown_link:
     print("[Web] http://{}/".format(shown_link[1]))
