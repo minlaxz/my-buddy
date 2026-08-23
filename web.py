@@ -1,4 +1,5 @@
 import socket
+import time
 
 import machine
 
@@ -77,10 +78,10 @@ class WebServer:
             client.settimeout(0.5)
             method, path = parse_request(client.recv(REQUEST_BYTES))
             code, ctype, body = self.route(method, path)
+            body = body.encode()
             client.send(
-                "HTTP/1.0 {}\r\nContent-Type: {}\r\nConnection: close\r\n\r\n".format(
-                    code, ctype
-                )
+                "HTTP/1.0 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n"
+                "Connection: close\r\n\r\n".format(code, ctype, len(body))
             )
             client.send(body)
         except OSError:
@@ -90,6 +91,8 @@ class WebServer:
 
         if self.reboot_pending:
             print("[Web] Reboot requested")
+            # Let the FIN leave the radio before the chip goes away.
+            time.sleep_ms(200)
             machine.reset()
 
     def route(self, method, path):
