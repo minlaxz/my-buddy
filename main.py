@@ -3,6 +3,7 @@ import time
 from wifi import wifi
 from display import display
 from web import WebServer
+from led import led
 
 
 # How often the Page re-reads the Wi-Fi Link (SSID / IP / RSSI).
@@ -82,10 +83,11 @@ def status():
     return {
         "link": shown_link,
         "uptime_s": time.ticks_diff(time.ticks_ms(), boot_tick) // 1000,
+        "led": led.color,
     }
 
 
-web = WebServer(status, display.show_message)
+web = WebServer(status, display.show_message, led)
 
 if shown_link:
     print("[Web] http://{}/".format(shown_link[1]))

@@ -1,6 +1,6 @@
 # Buddy
 
-A physical ESP32-S3 + 240x240 TFT unit on the owner's desk. Today it shows which Wi-Fi network it is on, its address and signal strength, and any Message the owner pushes to it over the LAN. Anything beyond that is not yet decided and not in this glossary.
+A physical ESP32-S3 + 240x240 TFT unit on the owner's desk. Today it shows which Wi-Fi network it is on, its address and signal strength, and any Message the owner pushes to it over the LAN; the owner can also set its LED. Anything beyond that is not yet decided and not in this glossary.
 
 ## Language
 
@@ -26,6 +26,10 @@ _Avoid_: connection status, network info
 **Message**:
 Text the owner pushes to the Terminal over its LAN control page. Drawn on the Page under the Wi-Fi Link and stays there until replaced or cleared; it never interrupts anything and never times out.
 _Avoid_: notification (the old interrupting, timed thing), alert, popup
+
+**LED**:
+The onboard RGB pixel, set by the owner over the LAN control page to a colour and brightness, or off. Holds whatever it was last set to; it means nothing on its own.
+_Avoid_: Beacon (the old name — it used to mirror Claude's Status), RGB, light
 
 **Heartbeat**:
 The row of dots at the bottom of the Page with one dot hopping along it. Says only that the firmware loop is alive; carries no data. If it stops, the Terminal is hung.

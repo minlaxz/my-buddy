@@ -3,6 +3,8 @@ import time
 
 import machine
 
+from led import parse_color, DEFAULT_BRIGHTNESS
+
 
 PORT = 80
 
@@ -84,8 +86,12 @@ def page(status):
         "<h1>Buddy</h1><p>{}</p><p>Uptime: {} s</p>"
         "<form method=post action=/message>"
         "<input name=text maxlength=200 autofocus> <button>Show</button></form>"
+        "<form method=post action=/led>"
+        "<input type=color name=color value={}> "
+        "<input type=number name=brightness min=0 max=100 value=5 size=3>% "
+        "<button>Set LED</button> <button name=color value=off>Off</button></form>"
         "<form method=post action=/reboot><button>Reboot</button></form>"
-    ).format(rows, status.get("uptime_s"))
+    ).format(rows, status.get("uptime_s"), status.get("led") or "#000000")
 
 
 def json_status(status):
@@ -99,17 +105,23 @@ def json_status(status):
     else:
         link_json = "null"
 
-    return '{{"link":{},"uptime_s":{}}}'.format(link_json, status.get("uptime_s"))
+    led = status.get("led")
+
+    return '{{"link":{},"uptime_s":{},"led":{}}}'.format(
+        link_json, status.get("uptime_s"), '"{}"'.format(led) if led else "null"
+    )
 
 
 class WebServer:
     """Tiny HTTP/1.0 server polled from the main loop. One request per poll."""
 
-    def __init__(self, status, on_message):
-        # status: callable returning {"link": (ssid, ip, rssi) | None, "uptime_s": int}
+    def __init__(self, status, on_message, led):
+        # status: callable returning {"link": (ssid, ip, rssi) | None, "uptime_s": int, "led": str | None}
         # on_message: callable(text) that puts a Message on the Page
+        # led: led.Led
         self.status = status
         self.on_message = on_message
+        self.led = led
         self.reboot_pending = False
 
         self.sock = socket.socket()
@@ -169,6 +181,22 @@ class WebServer:
             print("[Web] Message:", repr(text))
             self.on_message(text)
             return "200 OK", "text/plain", "Shown" if text else "Cleared"
+
+        if method == "POST" and path == "/led":
+            rgb = parse_color(form.get("color", "off"))
+            print("[Web] LED:", form.get("color"), form.get("brightness"))
+
+            if rgb is None:
+                self.led.off()
+                return "200 OK", "text/plain", "Off"
+
+            try:
+                brightness = int(form.get("brightness", DEFAULT_BRIGHTNESS))
+            except ValueError:
+                brightness = DEFAULT_BRIGHTNESS
+
+            self.led.set(rgb, brightness)
+            return "200 OK", "text/plain", self.led.color
 
         if method == "POST" and path == "/reboot":
             # Answer first, reset after the socket is closed.
