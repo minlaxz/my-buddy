@@ -22,3 +22,7 @@ _Avoid_: screen, dashboard, view
 **Wi-Fi Link**:
 What the one Page shows: the SSID the Terminal is joined to, its IP and its RSSI. When the Terminal is not joined to any known network the Page says so instead, and the Terminal keeps trying to join.
 _Avoid_: connection status, network info
+
+**Heartbeat**:
+The row of dots at the bottom of the Page with one dot hopping along it. Says only that the firmware loop is alive; carries no data. If it stops, the Terminal is hung.
+_Avoid_: animation, spinner, activity indicator
