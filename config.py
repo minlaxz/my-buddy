@@ -1,6 +1,2 @@
 WIFI_CONNECT_TIMEOUT = 15
 WIFI_RETRY_DELAY = 5
-
-NTFY_HOST = "ntfy.minlaxz.icu"
-NTFY_TOPIC = "hermes-output,claude-code"
-NTFY_MESSAGE_MS = 5_000

@@ -1,3 +1,9 @@
+---
+status: deprecated
+---
+
+> Deprecated 2026-08-23: ntfy, Status and the Beacon were removed from the Terminal (test-phase features). Kept for the record.
+
 # The Beacon mirrors Status, and goes dark rather than lie
 
 The onboard RGB LED shows Claude Code's Status as colour alone. Four decisions in it look arbitrary and are not.
@@ -18,3 +24,4 @@ The onboard RGB LED shows Claude Code's Status as colour alone. Four decisions i
 - `sleeping` and "no Status at all" are the same colour — off. The Terminal cannot distinguish "session ended" from "never started" on the LED alone; the header still can.
 - The 15 s stale rule means a link that flaps every 10 s never blanks the Beacon, and one down for 20 s blanks it even if Claude is genuinely still working. Both are correct under "colour must not outlive the evidence for it".
 - The Beacon writes on state change only, never per tick, so it costs the main loop nothing between Status messages.
+

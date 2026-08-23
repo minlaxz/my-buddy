@@ -1,3 +1,9 @@
+---
+status: deprecated
+---
+
+> Deprecated 2026-08-23: ntfy, Status and the Beacon were removed from the Terminal (test-phase features). Kept for the record.
+
 # Keep the raw-socket HTTP/1.0 ntfy stream
 
 `ntfy.py` subscribes with a hand-built request over a raw socket. Three details look like oversights and are not:
@@ -14,3 +20,4 @@
 - The connect path blocks for the DNS, TCP and TLS handshake. The five-second reconnect backoff exists to bound how long the main loop can stall on a dead link, not merely to be polite to the server.
 - The pinned User-Agent may need revisiting if Cloudflare's rules change. It is a string the edge accepts today, not a contract.
 - A non-200 status line is logged and the connection dropped. Without that check an authorization failure parses as valid headers and then goes quiet, which is indistinguishable from a healthy but idle topic — this cost real debugging time once already.
+

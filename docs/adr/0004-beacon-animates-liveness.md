@@ -1,3 +1,9 @@
+---
+status: deprecated
+---
+
+> Deprecated 2026-08-23: ntfy, Status and the Beacon were removed from the Terminal (test-phase features). Kept for the record.
+
 # The Beacon animates liveness, not identity
 
 Supersedes the "solid colour, v1" line of ADR-0003. The Beacon now breathes on `working` and pulses on `needs you`; `idle` and `sleeping` stay as they were.
@@ -21,3 +27,4 @@ Supersedes the "solid colour, v1" line of ADR-0003. The Beacon now breathes on `
 - ADR-0003's claim that the Beacon "costs the main loop nothing between Status messages" now holds only for `idle` and `sleeping`. A breathing state computes a level every pass and writes on change — still far below the SPI traffic the display generates.
 - Changing a breathe rate is a number in `BREATHE_MS`; adding a state to it turns that state from solid to breathing with no other edit. Removing one is equally cheap, which is the intended way to walk this back if the movement turns out to be noise.
 - The 600 ms pulse at a 20 ms tick gets ~30 steps, so it is smooth. It was designed against the 100 ms timer, where it would have had 6 and looked steppy; the per-pass call fixed that as a side effect of the popup problem.
+
