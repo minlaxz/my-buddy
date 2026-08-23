@@ -3,7 +3,7 @@ import st7789py as st7789
 import vga1_8x16 as font
 
 
-# Hermes TFT pin assignment
+# Buddy TFT pin assignment
 TFT_MOSI = 11
 TFT_SCLK = 12
 TFT_CS = 8
@@ -88,7 +88,7 @@ class Display:
 
     def show_header(self):
         self.text(
-            "HERMES",
+            "BUDDY",
             4,
             4,
             st7789.CYAN,
