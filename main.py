@@ -13,6 +13,24 @@ RECONNECT_MS = 30_000
 
 ANIMATION_INTERVAL_MS = 100
 
+# RSSI wobbles +-1 dBm between reads; only a move this big repaints the Page.
+RSSI_STEP_DBM = 3
+
+
+def link_changed(new, shown):
+    """True when the Page should repaint for `new` given what it shows."""
+
+    if new is None or shown is None:
+        return new != shown
+
+    if new[0] != shown[0] or new[1] != shown[1]:
+        return True
+
+    if new[2] is None or shown[2] is None:
+        return new[2] != shown[2]
+
+    return abs(new[2] - shown[2]) >= RSSI_STEP_DBM
+
 
 def read_link():
     """(ssid, ip, rssi) while joined, else None."""
@@ -90,7 +108,7 @@ while True:
             now = time.ticks_ms()
             next_animation = now
 
-        if link != shown_link:
+        if link_changed(link, shown_link):
             shown_link = link
             display.show_link(link)
             print("[Display]", link if link else "Disconnected")
