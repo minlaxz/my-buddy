@@ -2,6 +2,7 @@ import time
 
 from wifi import wifi
 from display import display
+from web import WebServer
 
 
 # How often the Page re-reads the Wi-Fi Link (SSID / IP / RSSI).
@@ -74,6 +75,21 @@ display.show_link(shown_link)
 
 print("[Display]", "Wi-Fi Link displayed" if shown_link else "Disconnected")
 
+boot_tick = now
+
+
+def status():
+    return {
+        "link": shown_link,
+        "uptime_s": time.ticks_diff(time.ticks_ms(), boot_tick) // 1000,
+    }
+
+
+web = WebServer(status)
+
+if shown_link:
+    print("[Web] http://{}/".format(shown_link[1]))
+
 next_poll = time.ticks_add(now, LINK_POLL_MS)
 last_connect_attempt = now
 next_animation = now
@@ -112,6 +128,8 @@ while True:
             shown_link = link
             display.show_link(link)
             print("[Display]", link if link else "Disconnected")
+
+    web.poll()
 
     # --------------------------------------------------------------
     # Persistent animation
