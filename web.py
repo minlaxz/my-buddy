@@ -8,10 +8,18 @@ from led import parse_color, DEFAULT_BRIGHTNESS
 
 PORT = 80
 
-# ponytail: whole request must fit here — a line, a few headers, a short form
-# body. /message caps at 200 chars in the page; curl can send more and gets
-# truncated.
-REQUEST_BYTES = 1536
+# ponytail: whole request must fit here — a line, browser fetch headers
+# (~800 bytes), a short form body. /message caps at 200 chars in the page;
+# curl can send more and gets truncated.
+REQUEST_BYTES = 2048
+
+INDEX_FILE = "index.html"
+
+# Chunk size when streaming the page out; keeps the heap calm on the device.
+SEND_CHUNK = 512
+
+# route() returns this as the body to mean "stream INDEX_FILE".
+INDEX_FILE_MARK = object()
 
 
 def unquote(s):
@@ -69,29 +77,6 @@ def content_length(data):
             except ValueError:
                 return 0
     return 0
-
-
-def page(status):
-    """The control page. `status` is the dict from the status callable."""
-
-    link = status.get("link")
-
-    if link:
-        rows = "SSID: {}<br>IP: {}<br>RSSI: {} dBm".format(*link)
-    else:
-        rows = "Disconnected"
-
-    return (
-        "<!doctype html><title>Buddy</title>"
-        "<h1>Buddy</h1><p>{}</p><p>Uptime: {} s</p>"
-        "<form method=post action=/message>"
-        "<input name=text maxlength=200 autofocus> <button>Show</button></form>"
-        "<form method=post action=/led>"
-        "<input type=color name=color value={}> "
-        "<input type=number name=brightness min=0 max=100 value=5 size=3>% "
-        "<button>Set LED</button> <button name=color value=off>Off</button></form>"
-        "<form method=post action=/reboot><button>Reboot</button></form>"
-    ).format(rows, status.get("uptime_s"), status.get("led") or "#000000")
 
 
 def json_status(status):
@@ -152,12 +137,25 @@ class WebServer:
 
             method, path, form = parse_request(data)
             code, ctype, body = self.route(method, path, form)
-            body = body.encode()
-            client.send(
-                "HTTP/1.0 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n"
-                "Connection: close\r\n\r\n".format(code, ctype, len(body))
-            )
-            client.send(body)
+
+            if body is INDEX_FILE_MARK:
+                client.send(
+                    "HTTP/1.0 {}\r\nContent-Type: {}\r\n"
+                    "Connection: close\r\n\r\n".format(code, ctype)
+                )
+                with open(INDEX_FILE, "rb") as f:
+                    while True:
+                        chunk = f.read(SEND_CHUNK)
+                        if not chunk:
+                            break
+                        client.send(chunk)
+            else:
+                body = body.encode()
+                client.send(
+                    "HTTP/1.0 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\n"
+                    "Connection: close\r\n\r\n".format(code, ctype, len(body))
+                )
+                client.send(body)
         except OSError:
             pass
         finally:
@@ -171,7 +169,7 @@ class WebServer:
 
     def route(self, method, path, form):
         if method == "GET" and path == "/":
-            return "200 OK", "text/html", page(self.status())
+            return "200 OK", "text/html", INDEX_FILE_MARK
 
         if method == "GET" and path == "/status":
             return "200 OK", "application/json", json_status(self.status())
