@@ -90,12 +90,25 @@ def json_status(status):
     else:
         link_json = "null"
 
+    ping = status.get("ping")
+
+    if ping:
+        avg, loss, jitter = ping
+        ping_json = '{{"avg_ms":{},"loss_pct":{},"jitter_ms":{}}}'.format(
+            "null" if avg is None else avg,
+            loss,
+            "null" if jitter is None else jitter,
+        )
+    else:
+        ping_json = "null"
+
     led = status.get("led")
 
     topics = ",".join('"{}"'.format(t) for t in status.get("topics", ()))
 
-    return '{{"link":{},"uptime_s":{},"led":{},"relay":{},"topics":[{}]}}'.format(
+    return '{{"link":{},"ping":{},"uptime_s":{},"led":{},"relay":{},"topics":[{}]}}'.format(
         link_json,
+        ping_json,
         status.get("uptime_s"),
         '"{}"'.format(led) if led else "null",
         "true" if status.get("relay") else "false",

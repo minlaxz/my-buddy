@@ -1,9 +1,11 @@
 import time
 
+import config
 from wifi import wifi
 from display import display
 from web import WebServer
 from led import led
+from ping import Pinger
 from relay import Relay, TOPICS
 
 
@@ -87,9 +89,11 @@ def status():
         "led": led.color,
         "relay": relay.client is not None,
         "topics": [t.decode() for t in TOPICS] if relay.client else [],
+        "ping": pinger.stats,
     }
 
 
+pinger = Pinger(config.PING_TARGET)
 relay = Relay(display.show_message, led)
 web = WebServer(status, display.show_message, led)
 
@@ -144,9 +148,20 @@ while True:
             next_animation = now
 
         if link_changed(link, shown_link):
+            if (link is None) != (shown_link is None):
+                pinger.reset()  # fresh window for the new link state
+                display.show_ping(None)
+
             shown_link = link
             display.show_link(link)
             print("[Display]", link if link else "Disconnected")
+
+    # --------------------------------------------------------------
+    # Ping: probe while the Link is up, repaint when a batch lands
+    # --------------------------------------------------------------
+
+    if shown_link and pinger.poll(now):
+        display.show_ping(pinger.stats)
 
     web.poll()
 

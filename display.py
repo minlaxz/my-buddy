@@ -16,10 +16,11 @@ TFT_HEIGHT = 240
 # 8x16 font: 30 columns, rows 16px tall.
 LINE_1_Y = 36
 LINE_2_Y = 56
+LINE_3_Y = 76  # Ping
 
-# Message area: below the Wi-Fi lines, above the Heartbeat.
-MESSAGE_Y = 84
-MESSAGE_ROWS = 6
+# Message area: below the Wi-Fi and Ping lines, above the Heartbeat.
+MESSAGE_Y = 100
+MESSAGE_ROWS = 5
 MESSAGE_COLS = 29
 
 # Relay state row: bottom-left, same baseline as the Heartbeat.
@@ -148,6 +149,50 @@ class Display:
 
         if line2 is not None:
             self.text(line2, 4, LINE_2_Y)
+
+    def show_ping(self, stats):
+        """Draw the Ping line under the Wi-Fi Link. None clears it.
+
+        stats: (avg_ms, loss_pct, jitter_ms); avg/jitter are None when the
+        whole batch was lost.
+        """
+
+        self.tft.fill_rect(0, LINE_3_Y, TFT_WIDTH, font.HEIGHT, st7789.BLACK)
+
+        if stats is None:
+            return
+
+        avg, loss, jitter = stats
+
+        # Loss tiers: clean green, degraded yellow, bad red.
+        if loss == 0:
+            loss_color = st7789.GREEN
+        elif loss <= 20:
+            loss_color = st7789.YELLOW
+        else:
+            loss_color = st7789.RED
+
+        # Jitter tiers from VoIP guidance: <=20 ms fine, <=30 ms edge, above bad.
+        if jitter is None:
+            jitter_color = st7789.WHITE
+        elif jitter <= 20:
+            jitter_color = st7789.GREEN
+        elif jitter <= 30:
+            jitter_color = st7789.YELLOW
+        else:
+            jitter_color = st7789.RED
+
+        segments = (
+            ("PING: ", st7789.WHITE),
+            (("--" if avg is None else "{}ms".format(avg)) + " ", st7789.WHITE),
+            ("L: {}% ".format(loss), loss_color),
+            ("J: --" if jitter is None else "J: {}ms".format(jitter), jitter_color),
+        )
+
+        x = 4
+        for part, color in segments:
+            self.text(part, x, LINE_3_Y, color)
+            x += len(part) * font.WIDTH
 
     def show_message(self, text):
         """Draw a Message below the Wi-Fi lines. Empty text clears the area."""

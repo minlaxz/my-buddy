@@ -23,6 +23,10 @@ _Avoid_: screen, dashboard, view
 What the one Page shows: the SSID the Terminal is joined to, its IP and its RSSI. When the Terminal is not joined to any known network the Page says so instead, and the Terminal keeps trying to join.
 _Avoid_: connection status, network info
 
+**Ping**:
+A line on the Page under the Wi-Fi Link showing round-trip quality to the internet: average time and jitter over the latest few probes, loss over a longer rolling window. Blank while the Terminal has no link; dashes when nothing comes back at all. Also shown on the Control Page.
+_Avoid_: latency check, ICMP (implementation detail), Heartbeat (that's the loop-alive dot)
+
 **Control Page**:
 The web page the Terminal serves at its own LAN address. The owner reads the Wi-Fi Link there and sets the Message and the LED, or reboots. Reachable only from the same network; it trusts anyone on it.
 _Avoid_: dashboard, admin, API (the JSON behind it is an implementation detail)

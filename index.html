@@ -115,6 +115,7 @@ footer p{margin:0;overflow-wrap:anywhere}
     <dt>ssid</dt><dd id="ssid">—</dd>
     <dt>ip</dt><dd id="ip">—</dd>
     <dt>rssi</dt><dd><span id="rssi">—</span><span class="bars" id="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></dd>
+    <dt>ping</dt><dd id="ping">—</dd>
   </dl>
 </section>
 
@@ -138,7 +139,7 @@ footer p{margin:0;overflow-wrap:anywhere}
 
 <section id="message" class="wide">
   <h2>message</h2>
-  <label for="text" class="state" style="display:block;margin-bottom:var(--space-2xs)">drawn on the tft under the wifi lines · 7 rows</label>
+  <label for="text" class="state" style="display:block;margin-bottom:var(--space-2xs)">drawn on the tft under the wifi lines · 5 rows</label>
   <textarea id="text" maxlength="200" spellcheck="false"></textarea>
   <div class="row">
     <button class="pri" id="show">show</button>
@@ -194,6 +195,8 @@ function render(s){
   $('rssi').textContent=l&&l.rssi!=null?l.rssi+' dBm':'—';
   const n=l&&l.rssi!=null?(l.rssi>=-55?4:l.rssi>=-65?3:l.rssi>=-75?2:1):0;
   [...$('bars').children].forEach((b,i)=>b.classList.toggle('on',i<n));
+  const p=s.ping;
+  $('ping').textContent=p?(p.avg_ms==null?'-- · '+p.loss_pct+'% loss':p.avg_ms+' ms · '+p.loss_pct+'% loss · ±'+p.jitter_ms+' ms'):'—';
   $('up').textContent=fmtUp(s.uptime_s);
   $('lednow').textContent=s.led||'off';
   const conn=(id,up)=>{const d=$(id);d.textContent=up?'up':'down';d.className=up?'up':'down'};
