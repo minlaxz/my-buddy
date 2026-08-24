@@ -19,11 +19,17 @@ LINE_2_Y = 56
 
 # Message area: below the Wi-Fi lines, above the Heartbeat.
 MESSAGE_Y = 84
-MESSAGE_ROWS = 7
+MESSAGE_ROWS = 6
 MESSAGE_COLS = 29
 
-# Relay state row: bottom-left, same baseline as the Heartbeat dots.
-RELAY_Y = 208
+# Relay state row: bottom-left, same baseline as the Heartbeat.
+RELAY_Y = 192  # three rows: RELAY / Sub / Pub, stepped by font.HEIGHT
+
+# Heartbeat: one dot, bottom-right corner. Blinks ~1 Hz, colour steps R/G/B.
+HEARTBEAT_X = TFT_WIDTH - 12  # right end of the header (Buddy) line
+HEARTBEAT_Y = 8
+TICKS_PER_SEC = 10  # main loop drives show_animation every 100 ms
+HEARTBEAT_COLORS = (st7789.RED, st7789.GREEN, st7789.BLUE)
 
 
 def wrap(text, width):
@@ -116,7 +122,7 @@ class Display:
 
     def show_header(self):
         self.text(
-            "BUDDY",
+            "Buddy",
             4,
             4,
             st7789.CYAN,
@@ -157,10 +163,11 @@ class Display:
         for i, line in enumerate(wrap(str(text), MESSAGE_COLS)[:MESSAGE_ROWS]):
             self.text(line, 4, MESSAGE_Y + i * font.HEIGHT, st7789.YELLOW)
 
-    def show_relay(self, up):
-        """Draw the Relay state bottom-left, beside the Heartbeat."""
+    def show_relay(self, up, sub, pub):
+        """Draw the Relay block at the bottom: state, Sub topic, Pub topic."""
 
-        self.tft.fill_rect(0, RELAY_Y, 140, font.HEIGHT, st7789.BLACK)
+        self.tft.fill_rect(0, RELAY_Y, TFT_WIDTH, 3 * font.HEIGHT, st7789.BLACK)
+
         self.text("RELAY ", 4, RELAY_Y)
         self.text(
             "UP" if up else "DOWN",
@@ -169,45 +176,20 @@ class Display:
             st7789.GREEN if up else st7789.RED,
         )
 
+        self.text("Sub: " + sub, 4, RELAY_Y + font.HEIGHT)
+        self.text("Pub: " + pub, 4, RELAY_Y + 2 * font.HEIGHT)
+
     def show_animation(self, frame):
-        """
-        Small persistent activity indicator.
+        """One dot bottom-right: blinks each half-second, its colour steps
+        red -> green -> blue each second. Frozen dot means a hung loop."""
 
-        Only redraws the animation region.
-        """
+        # 100 ms per frame: 10 frames = 1 s. On for the first half-second of
+        # each second, off for the second half -> a ~1 Hz blink.
+        second = frame // TICKS_PER_SEC
+        on = (frame % TICKS_PER_SEC) < (TICKS_PER_SEC // 2)
+        color = HEARTBEAT_COLORS[second % len(HEARTBEAT_COLORS)]
 
-        x_start = 144
-        y = 212
-        spacing = 10
-        count = 8
-
-        self.tft.fill_rect(
-            x_start,
-            204,
-            96,
-            36,
-            st7789.BLACK,
-        )
-
-        for i in range(count):
-            x = x_start + (i * spacing)
-
-            if i == frame:
-                self.tft.fill_rect(
-                    x,
-                    y,
-                    6,
-                    6,
-                    st7789.GREEN,
-                )
-            else:
-                self.tft.fill_rect(
-                    x,
-                    y,
-                    3,
-                    3,
-                    st7789.WHITE,
-                )
+        self.tft.fill_rect(HEARTBEAT_X, HEARTBEAT_Y, 8, 8, color if on else st7789.BLACK)
 
 
 display = Display()

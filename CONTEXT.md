@@ -44,5 +44,5 @@ The onboard RGB pixel, set to a colour or off from the Control Page or by a Send
 _Avoid_: Beacon (the old name — it used to mirror Claude's Status), RGB, light
 
 **Heartbeat**:
-The row of dots at the bottom of the Page with one dot hopping along it. Says only that the firmware loop is alive; carries no data. If it stops, the Terminal is hung.
+A single dot in the bottom corner of the Page that blinks about once a second, its colour stepping red, green, blue. Says only that the firmware loop is alive; carries no data. If it freezes on one colour, the Terminal is hung.
 _Avoid_: animation, spinner, activity indicator
