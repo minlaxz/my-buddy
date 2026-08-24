@@ -16,21 +16,30 @@ TFT_HEIGHT = 240
 # 8x16 font: 30 columns, rows 16px tall.
 LINE_1_Y = 36
 LINE_2_Y = 56
-LINE_3_Y = 76  # Ping
 
-# Message area: below the Wi-Fi and Ping lines, above the Heartbeat.
-MESSAGE_Y = 100
-MESSAGE_ROWS = 5
+# Header line: "Buddy", Ping stats, Relay state dot in the top-right corner.
+PING_X = 4 + 6 * 8  # after "Buddy" + one space, font.WIDTH = 8
+PING_Y = 4
+
+# Message area: below the Wi-Fi lines (Ping moved to the header, so it
+# starts on the old ping row), down to just above the Relay block.
+MESSAGE_Y = 76
+MESSAGE_ROWS = 7  # 76 + 7*16 = 188, clears RELAY_Y = 192
 MESSAGE_COLS = 29
 
-# Relay state row: bottom-left, same baseline as the Heartbeat.
-RELAY_Y = 192  # three rows: RELAY / Sub / Pub, stepped by font.HEIGHT
+# Relay block: bottom-left, Sub / Pub rows (state dot lives on the header).
+RELAY_Y = 192  # two rows stepped by font.HEIGHT
 
-# Heartbeat: one dot, bottom-right corner. Blinks ~1 Hz, colour steps R/G/B.
-HEARTBEAT_X = TFT_WIDTH - 12  # right end of the header (Buddy) line
-HEARTBEAT_Y = 8
-TICKS_PER_SEC = 10  # main loop drives show_animation every 100 ms
-HEARTBEAT_COLORS = (st7789.RED, st7789.GREEN, st7789.BLUE)
+# Relay state dot: top-right corner, flickers ~2.5 Hz; colour = state.
+# It doubles as the Heartbeat — a frozen dot means a hung loop.
+RELAY_DOT_X = TFT_WIDTH - 12
+RELAY_DOT_Y = 8
+RELAY_DOT_COLORS = {
+    "up": st7789.GREEN,
+    "down": st7789.RED,
+    "rx": st7789.YELLOW,  # receiving from the Relay
+    "tx": st7789.BLUE,  # sending to the Relay (Receipt ack)
+}
 
 
 def wrap(text, width):
@@ -151,13 +160,16 @@ class Display:
             self.text(line2, 4, LINE_2_Y)
 
     def show_ping(self, stats):
-        """Draw the Ping line under the Wi-Fi Link. None clears it.
+        """Draw the Ping stats on the header line, beside "Buddy". None clears.
 
         stats: (avg_ms, loss_pct, jitter_ms); avg/jitter are None when the
         whole batch was lost.
         """
 
-        self.tft.fill_rect(0, LINE_3_Y, TFT_WIDTH, font.HEIGHT, st7789.BLACK)
+        # Stop short of the Relay state dot.
+        self.tft.fill_rect(
+            PING_X, PING_Y, RELAY_DOT_X - 4 - PING_X, font.HEIGHT, st7789.BLACK
+        )
 
         if stats is None:
             return
@@ -182,16 +194,17 @@ class Display:
         else:
             jitter_color = st7789.RED
 
+        # No "PING:" label — compact so worst case (999ms L:100% J:999ms,
+        # 20 chars) still clears the Heartbeat dot.
         segments = (
-            ("PING: ", st7789.WHITE),
             (("--" if avg is None else "{}ms".format(avg)) + " ", st7789.WHITE),
-            ("L: {}% ".format(loss), loss_color),
-            ("J: --" if jitter is None else "J: {}ms".format(jitter), jitter_color),
+            ("L:{}% ".format(loss), loss_color),
+            ("J:--" if jitter is None else "J:{}ms".format(jitter), jitter_color),
         )
 
-        x = 4
+        x = PING_X
         for part, color in segments:
-            self.text(part, x, LINE_3_Y, color)
+            self.text(part, x, PING_Y, color)
             x += len(part) * font.WIDTH
 
     def show_message(self, text):
@@ -208,33 +221,27 @@ class Display:
         for i, line in enumerate(wrap(str(text), MESSAGE_COLS)[:MESSAGE_ROWS]):
             self.text(line, 4, MESSAGE_Y + i * font.HEIGHT, st7789.YELLOW)
 
-    def show_relay(self, up, sub, pub):
-        """Draw the Relay block at the bottom: state, Sub topic, Pub topic."""
+    def show_relay(self, sub, pub):
+        """Draw the Relay topic rows; state is the header dot (show_relay_dot)."""
 
-        self.tft.fill_rect(0, RELAY_Y, TFT_WIDTH, 3 * font.HEIGHT, st7789.BLACK)
+        self.tft.fill_rect(0, RELAY_Y, TFT_WIDTH, 2 * font.HEIGHT, st7789.BLACK)
 
-        self.text("RELAY ", 4, RELAY_Y)
-        self.text(
-            "UP" if up else "DOWN",
-            4 + 6 * font.WIDTH,
-            RELAY_Y,
-            st7789.GREEN if up else st7789.RED,
+        self.text("Sub: " + sub, 4, RELAY_Y)
+        self.text("Pub: " + pub, 4, RELAY_Y + font.HEIGHT)
+
+    def show_relay_dot(self, frame, state):
+        """Flickering Relay state dot, top-right of the header line.
+
+        state: "up" / "down" / "rx" / "tx". Flicker ~2.5 Hz so a short
+        rx/tx flash is never swallowed by an off phase; a frozen dot
+        means a hung loop.
+        """
+
+        on = frame % 4 < 2
+        color = RELAY_DOT_COLORS[state]
+        self.tft.fill_rect(
+            RELAY_DOT_X, RELAY_DOT_Y, 8, 8, color if on else st7789.BLACK
         )
-
-        self.text("Sub: " + sub, 4, RELAY_Y + font.HEIGHT)
-        self.text("Pub: " + pub, 4, RELAY_Y + 2 * font.HEIGHT)
-
-    def show_animation(self, frame):
-        """One dot bottom-right: blinks each half-second, its colour steps
-        red -> green -> blue each second. Frozen dot means a hung loop."""
-
-        # 100 ms per frame: 10 frames = 1 s. On for the first half-second of
-        # each second, off for the second half -> a ~1 Hz blink.
-        second = frame // TICKS_PER_SEC
-        on = (frame % TICKS_PER_SEC) < (TICKS_PER_SEC // 2)
-        color = HEARTBEAT_COLORS[second % len(HEARTBEAT_COLORS)]
-
-        self.tft.fill_rect(HEARTBEAT_X, HEARTBEAT_Y, 8, 8, color if on else st7789.BLACK)
 
 
 display = Display()

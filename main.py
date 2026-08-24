@@ -98,16 +98,16 @@ relay = Relay(display.show_message, led)
 web = WebServer(status, display.show_message, led)
 
 def relay_lines():
-    """(up, sub, pub) for the Relay block."""
+    """(sub, pub) for the Relay block."""
 
     up = relay.client is not None
     sub = ",".join(t.decode() for t in TOPICS) if up else "-"
     pub = ",".join(t.decode() + "/ack" for t in TOPICS) if up else "-"  # Receipts
-    return up, sub, pub
+    return sub, pub
 
 
 shown_relay = False
-display.show_relay(*relay_lines())
+display.show_relay(*relay_lines())  # topics only; state is the dot
 
 if shown_link:
     print("[Web] http://{}/".format(shown_link[1]))
@@ -117,6 +117,15 @@ last_connect_attempt = now
 last_relay_attempt = now - RECONNECT_MS  # try on first poll
 next_animation = now
 animation_frame = 0
+
+# Relay state dot: rx/tx events flash yellow/blue for FLASH_MS each, queued
+# so the ack's blue is not swallowed by the receive's yellow.
+FLASH_MS = 600
+flash_queue = []
+flash_state = None
+flash_until = 0
+seen_rx = None
+seen_tx = None
 
 
 # ----------------------------------------------------------------------
@@ -184,16 +193,35 @@ while True:
         display.show_relay(*relay_lines())
 
     # --------------------------------------------------------------
-    # Persistent animation
+    # Relay state dot (doubles as the Heartbeat)
     # --------------------------------------------------------------
+
+    # Relay state dot: pick up new rx/tx events, run the flash queue.
+    if relay.rx_at != seen_rx:
+        seen_rx = relay.rx_at
+        flash_queue.append("rx")
+
+    if relay.tx_at != seen_tx:
+        seen_tx = relay.tx_at
+        flash_queue.append("tx")
+
+    if flash_state is not None and time.ticks_diff(now, flash_until) >= 0:
+        flash_state = None
+
+    if flash_state is None and flash_queue:
+        flash_state = flash_queue.pop(0)
+        flash_until = time.ticks_add(now, FLASH_MS)
 
     if time.ticks_diff(now, next_animation) >= 0:
 
-        display.show_animation(animation_frame)
+        display.show_relay_dot(
+            animation_frame,
+            flash_state or ("up" if relay.client else "down"),
+        )
 
         animation_frame += 1
 
-        if animation_frame >= 30:  # 3 colours x 10 ticks/s
+        if animation_frame >= 20:  # multiple of the dot's 4-frame flicker
             animation_frame = 0
 
         next_animation = time.ticks_add(

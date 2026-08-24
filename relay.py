@@ -42,6 +42,8 @@ class Relay:
         self.client = None
         self.next_ping = 0
         self.pending_ack = None  # (ack_topic, payload) set on render, sent by poll()
+        self.rx_at = None  # ticks_ms of the last receive / ack send, for the
+        self.tx_at = None  # Relay state dot's flashes
 
     def connect(self):
         """Blocking (NTP + TLS handshake, seconds). Call only while Wi-Fi Link is up."""
@@ -91,6 +93,7 @@ class Relay:
                 topic, payload = self.pending_ack
                 self.pending_ack = None
                 self.client.publish(topic, payload, retain=False)
+                self.tx_at = time.ticks_ms()
 
             if time.ticks_diff(time.ticks_ms(), self.next_ping) >= 0:
                 self.client.ping()
@@ -101,6 +104,8 @@ class Relay:
             self.pending_ack = None
 
     def _on_publish(self, topic, msg):
+        self.rx_at = time.ticks_ms()
+
         parsed = parse_payload(topic, msg)
 
         if parsed is None:
