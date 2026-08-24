@@ -4,6 +4,7 @@ from wifi import wifi
 from display import display
 from web import WebServer
 from led import led
+from relay import Relay, TOPICS
 
 
 # How often the Page re-reads the Wi-Fi Link (SSID / IP / RSSI).
@@ -84,16 +85,23 @@ def status():
         "link": shown_link,
         "uptime_s": time.ticks_diff(time.ticks_ms(), boot_tick) // 1000,
         "led": led.color,
+        "relay": relay.client is not None,
+        "topics": [t.decode() for t in TOPICS] if relay.client else [],
     }
 
 
+relay = Relay(display.show_message, led)
 web = WebServer(status, display.show_message, led)
+
+shown_relay = False
+display.show_relay(shown_relay)
 
 if shown_link:
     print("[Web] http://{}/".format(shown_link[1]))
 
 next_poll = time.ticks_add(now, LINK_POLL_MS)
 last_connect_attempt = now
+last_relay_attempt = now - RECONNECT_MS  # try on first poll
 next_animation = now
 animation_frame = 0
 
@@ -132,6 +140,24 @@ while True:
             print("[Display]", link if link else "Disconnected")
 
     web.poll()
+
+    # --------------------------------------------------------------
+    # Relay: connect while the Link is up, then poll for retained
+    # Message / LED. connect() blocks for the TLS handshake (seconds),
+    # so it runs on the Wi-Fi retry cadence, never every tick.
+    # --------------------------------------------------------------
+
+    if relay.client is None and shown_link and time.ticks_diff(now, last_relay_attempt) >= RECONNECT_MS:
+        last_relay_attempt = now
+        relay.connect()
+        now = time.ticks_ms()
+        next_animation = now
+
+    relay.poll()
+
+    if (relay.client is not None) != shown_relay:
+        shown_relay = relay.client is not None
+        display.show_relay(shown_relay)
 
     # --------------------------------------------------------------
     # Persistent animation

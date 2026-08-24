@@ -56,6 +56,7 @@ h2::before{content:"[ ";color:var(--color-rule)}h2::after{content:" ]";color:var
 .kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:var(--space-3xs) var(--space-md);margin:0}
 .kv dt{color:var(--color-neutral)}
 .kv dd{margin:0;overflow-wrap:anywhere}
+.kv dd.up{color:var(--color-accent);font-weight:600}.kv dd.down{color:var(--color-bad);font-weight:600}
 .bars{display:inline-flex;gap:2px;align-items:flex-end;height:.9em;margin-left:var(--space-2xs);vertical-align:-1px}
 .bars i{width:3px;background:var(--color-rule)}
 .bars i:nth-child(1){height:30%}.bars i:nth-child(2){height:55%}.bars i:nth-child(3){height:78%}.bars i:nth-child(4){height:100%}
@@ -100,12 +101,11 @@ footer p{margin:0;overflow-wrap:anywhere}
 @media (prefers-reduced-motion:reduce){.caret{animation:none}*{transition-duration:0s!important}}
 </style>
 
-<header class="nav"><pre><span class="p">&gt;</span>buddy <a href="#wifi">--wifi</a> <a href="#message">--message</a> <a href="#led">--led</a> <a href="#system">--system</a><span class="caret" aria-hidden="true">▮</span></pre></header>
+<header class="nav"><pre><span class="p">&gt;</span>buddy <a href="#wifi">--wifi</a> <a href="#message">--message</a> <a href="#led">--led</a> <a href="#system">--system</a> <a href="#connections">--mqtt</a><span class="caret" aria-hidden="true">▮</span></pre></header>
 
 <main>
 <div class="head">
   <h1>buddy</h1>
-  <p class="state" id="state" aria-live="polite">link <b>…</b></p>
 </div>
 
 <div class="panels">
@@ -125,6 +125,15 @@ footer p{margin:0;overflow-wrap:anywhere}
     <dt>led</dt><dd id="lednow">off</dd>
   </dl>
   <div class="row"><button class="danger" id="reboot">reboot</button></div>
+</section>
+
+<section id="connections">
+  <h2>connections</h2>
+  <dl class="kv">
+    <dt>link</dt><dd id="linkst">—</dd>
+    <dt>relay</dt><dd id="relayst">—</dd>
+    <dt>topics</dt><dd id="topics">—</dd>
+  </dl>
 </section>
 
 <section id="message" class="wide">
@@ -180,18 +189,20 @@ async function run(btn,fn){
 }
 function fmtUp(s){const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+(h?h+'h ':'')+m+'m '+(s%60)+'s'}
 function render(s){
-  const l=s.link,st=$('state');
-  st.className='state '+(l?'':'off');st.innerHTML='link <b>'+(l?'up':'down')+'</b>';
+  const l=s.link;
   $('ssid').textContent=l?l.ssid:'disconnected';$('ip').textContent=l?l.ip:'—';
   $('rssi').textContent=l&&l.rssi!=null?l.rssi+' dBm':'—';
   const n=l&&l.rssi!=null?(l.rssi>=-55?4:l.rssi>=-65?3:l.rssi>=-75?2:1):0;
   [...$('bars').children].forEach((b,i)=>b.classList.toggle('on',i<n));
   $('up').textContent=fmtUp(s.uptime_s);
   $('lednow').textContent=s.led||'off';
+  const conn=(id,up)=>{const d=$(id);d.textContent=up?'up':'down';d.className=up?'up':'down'};
+  conn('linkst',!!l);conn('relayst',!!s.relay);
+  $('topics').textContent=(s.topics&&s.topics.length)?s.topics.join(' · '):'—';
   document.querySelectorAll('.sw button').forEach(b=>b.setAttribute('aria-pressed',String((s.led||'off')===b.dataset.c)));
   $('foot').textContent='buddy · '+(l?l.ip:'no link')+' · up '+fmtUp(s.uptime_s)+' · micropython / esp32-s3';
 }
-async function refresh(){try{render(await (await fetch('/status')).json())}catch(e){const st=$('state');st.className='state unk';st.innerHTML='link <b>unreachable</b>'}}
+async function refresh(){try{render(await (await fetch('/status')).json())}catch(e){for(const id of['linkst','relayst']){const d=$(id);d.textContent='unreachable';d.className='down'}}}
 refresh();setInterval(refresh,5000);
 $('text').oninput=()=>$('count').textContent=$('text').value.length;
 $('show').onclick=()=>run($('show'),()=>post('/message',{text:$('text').value}));

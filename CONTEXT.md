@@ -1,6 +1,6 @@
 # Buddy
 
-A physical ESP32-S3 + 240x240 TFT unit on the owner's desk. Today it shows which Wi-Fi network it is on, its address and signal strength, and any Message the owner pushes to it from its Control Page; the owner can also set its LED from there. Anything beyond that is not yet decided and not in this glossary.
+A physical ESP32-S3 + 240x240 TFT unit on the owner's desk. Today it shows which Wi-Fi network it is on, its address and signal strength, and any Message pushed to it from its Control Page or through the Relay; the LED is set the same two ways. Anything beyond that is not yet decided and not in this glossary.
 
 ## Language
 
@@ -27,12 +27,20 @@ _Avoid_: connection status, network info
 The web page the Terminal serves at its own LAN address. The owner reads the Wi-Fi Link there and sets the Message and the LED, or reboots. Reachable only from the same network; it trusts anyone on it.
 _Avoid_: dashboard, admin, API (the JSON behind it is an implementation detail)
 
+**Relay**:
+The way to reach the Terminal from beyond its LAN. It holds the last Message and LED a Sender gave it, and hands them over whenever the Terminal connects to it — so a Terminal that was off or away catches up, and the Relay's last word wins over anything set on the Control Page in between. The Page and the Control Page both say whether the Terminal is currently joined to it.
+_Avoid_: MQTT, HiveMQ, broker, cloud, topic
+
+**Sender**:
+Anything that pushes a Message or LED through the Relay. Today: a command-line tool on the owner's Mac. Not the Terminal, and not the Control Page.
+_Avoid_: publisher, client, hook
+
 **Message**:
-Text the owner pushes to the Terminal from the Control Page. Drawn on the Page under the Wi-Fi Link and stays there until replaced or cleared; it never interrupts anything and never times out.
+Text pushed to the Terminal from the Control Page or by a Sender through the Relay. Drawn on the Page under the Wi-Fi Link and stays there until replaced or cleared; it never interrupts anything and never times out.
 _Avoid_: notification (the old interrupting, timed thing), alert, popup
 
 **LED**:
-The onboard RGB pixel, set by the owner from the Control Page to a colour and brightness, or off. Holds whatever it was last set to; it means nothing on its own.
+The onboard RGB pixel, set to a colour or off from the Control Page or by a Sender through the Relay. Holds whatever it was last set to; it means nothing on its own.
 _Avoid_: Beacon (the old name — it used to mirror Claude's Status), RGB, light
 
 **Heartbeat**:

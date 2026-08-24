@@ -5,3 +5,8 @@ WIFI_NETWORKS = [
     ("Wifi-2", "guest-password"),
     ("Wifi-3", "office-password"),
 ]
+
+# Relay: HiveMQ Cloud cluster and the subscribe-only "terminal" credential.
+MQTT_HOST = "xxxxxxxx.s1.eu.hivemq.cloud"
+MQTT_USER = "terminal"
+MQTT_PASS = "terminal-password"

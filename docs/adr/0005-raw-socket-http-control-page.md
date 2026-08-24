@@ -8,7 +8,7 @@
 
 **Static page + JSON, not templates.** `index.html` is served verbatim from flash in 512-byte chunks; its JavaScript polls `GET /status` and POSTs form-encoded bodies. Keeps Python free of HTML strings and keeps the page editable by a browser person without touching MicroPython.
 
-Rejected: MQTT (needs a broker; the owner is on the same LAN, nothing is queued while the Terminal is away), WebREPL (a shell, not a product), the old ntfy push channel (removed with the test-phase features).
+Rejected: MQTT (needs a broker; the owner is on the same LAN, nothing is queued while the Terminal is away — revisited as an experiment in ADR-0006 once a broker existed; the Control Page stays), WebREPL (a shell, not a product), the old ntfy push channel (removed with the test-phase features).
 
 ## Consequences
 

@@ -22,6 +22,9 @@ MESSAGE_Y = 84
 MESSAGE_ROWS = 7
 MESSAGE_COLS = 29
 
+# Relay state row: bottom-left, same baseline as the Heartbeat dots.
+RELAY_Y = 208
+
 
 def wrap(text, width):
     """Split text into lines of at most `width` chars, keeping existing breaks."""
@@ -153,6 +156,18 @@ class Display:
 
         for i, line in enumerate(wrap(str(text), MESSAGE_COLS)[:MESSAGE_ROWS]):
             self.text(line, 4, MESSAGE_Y + i * font.HEIGHT, st7789.YELLOW)
+
+    def show_relay(self, up):
+        """Draw the Relay state bottom-left, beside the Heartbeat."""
+
+        self.tft.fill_rect(0, RELAY_Y, 140, font.HEIGHT, st7789.BLACK)
+        self.text("RELAY ", 4, RELAY_Y)
+        self.text(
+            "UP" if up else "DOWN",
+            4 + 6 * font.WIDTH,
+            RELAY_Y,
+            st7789.GREEN if up else st7789.RED,
+        )
 
     def show_animation(self, frame):
         """

@@ -92,8 +92,14 @@ def json_status(status):
 
     led = status.get("led")
 
-    return '{{"link":{},"uptime_s":{},"led":{}}}'.format(
-        link_json, status.get("uptime_s"), '"{}"'.format(led) if led else "null"
+    topics = ",".join('"{}"'.format(t) for t in status.get("topics", ()))
+
+    return '{{"link":{},"uptime_s":{},"led":{},"relay":{},"topics":[{}]}}'.format(
+        link_json,
+        status.get("uptime_s"),
+        '"{}"'.format(led) if led else "null",
+        "true" if status.get("relay") else "false",
+        topics,
     )
 
 
