@@ -35,6 +35,10 @@ _Avoid_: MQTT, HiveMQ, broker, cloud, topic
 Anything that pushes a Message or LED through the Relay. Today: a command-line tool on the owner's Mac. Not the Terminal, and not the Control Page.
 _Avoid_: publisher, client, hook
 
+**Receipt**:
+What the Terminal sends back through the Relay the moment it shows a Message or sets the LED — an echo of what it rendered. A Sender waits a few seconds for it, so pushing a Message can tell the owner the desk unit really changed, not just that the Relay took it. Times out quietly when the Terminal is away; the last Message and LED still arrive later, the owner just did not get live word. Carries no state and is never held.
+_Avoid_: ack, acknowledgement, confirmation, publish, outbound topic
+
 **Message**:
 Text pushed to the Terminal from the Control Page or by a Sender through the Relay. Drawn on the Page under the Wi-Fi Link and stays there until replaced or cleared; it never interrupts anything and never times out.
 _Avoid_: notification (the old interrupting, timed thing), alert, popup

@@ -93,8 +93,17 @@ def status():
 relay = Relay(display.show_message, led)
 web = WebServer(status, display.show_message, led)
 
+def relay_lines():
+    """(up, sub, pub) for the Relay block."""
+
+    up = relay.client is not None
+    sub = ",".join(t.decode() for t in TOPICS) if up else "-"
+    pub = ",".join(t.decode() + "/ack" for t in TOPICS) if up else "-"  # Receipts
+    return up, sub, pub
+
+
 shown_relay = False
-display.show_relay(shown_relay)
+display.show_relay(*relay_lines())
 
 if shown_link:
     print("[Web] http://{}/".format(shown_link[1]))
@@ -157,7 +166,7 @@ while True:
 
     if (relay.client is not None) != shown_relay:
         shown_relay = relay.client is not None
-        display.show_relay(shown_relay)
+        display.show_relay(*relay_lines())
 
     # --------------------------------------------------------------
     # Persistent animation
@@ -169,7 +178,7 @@ while True:
 
         animation_frame += 1
 
-        if animation_frame >= 8:
+        if animation_frame >= 30:  # 3 colours x 10 ticks/s
             animation_frame = 0
 
         next_animation = time.ticks_add(
