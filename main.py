@@ -1,5 +1,7 @@
 import time
 
+import ntptime
+
 import config
 from wifi import wifi
 from display import display
@@ -20,6 +22,10 @@ ANIMATION_INTERVAL_MS = 100
 
 # RSSI wobbles +-1 dBm between reads; only a move this big repaints the Page.
 RSSI_STEP_DBM = 3
+
+# Clock: NTP on link-up, then every 6 h; retry each minute until it lands.
+NTP_OK_MS = 6 * 3600_000
+NTP_RETRY_MS = 60_000
 
 
 def link_changed(new, shown):
@@ -97,17 +103,27 @@ pinger = Pinger(config.PING_TARGET)
 relay = Relay(display.show_message, led)
 web = WebServer(status, display.show_message, led)
 
-def relay_lines():
-    """(sub, pub) for the Relay block."""
 
-    up = relay.client is not None
-    sub = ",".join(t.decode() for t in TOPICS) if up else "-"
-    pub = ",".join(t.decode() + "/ack" for t in TOPICS) if up else "-"  # Receipts
-    return sub, pub
+def online():
+    """Internet reachable: a link and the latest Ping batch not fully lost."""
+
+    if shown_link is None:
+        return False
+    return pinger.stats is None or pinger.stats[0] is not None
 
 
-shown_relay = False
-display.show_relay(*relay_lines())  # topics only; state is the dot
+def local_time():
+    """time.localtime() shifted to config.TZ_OFFSET_MIN, or None before sync."""
+
+    if time.localtime()[0] < 2025:
+        return None
+    return time.localtime(time.time() + config.TZ_OFFSET_MIN * 60)
+
+
+shown_online = True  # show_header() drew cyan
+shown_clock = None
+display.show_clock(None)
+next_ntp = now  # first sync as soon as the link is up
 
 if shown_link:
     print("[Web] http://{}/".format(shown_link[1]))
@@ -120,7 +136,7 @@ animation_frame = 0
 
 # Relay state dot: rx/tx events flash yellow/blue for FLASH_MS each, queued
 # so the ack's blue is not swallowed by the receive's yellow.
-FLASH_MS = 600
+FLASH_MS = 800
 flash_queue = []
 flash_state = None
 flash_until = 0
@@ -188,9 +204,34 @@ while True:
 
     relay.poll()
 
-    if (relay.client is not None) != shown_relay:
-        shown_relay = relay.client is not None
-        display.show_relay(*relay_lines())
+    # --------------------------------------------------------------
+    # "Buddy" colour: internet reach
+    # --------------------------------------------------------------
+
+    if online() != shown_online:
+        shown_online = online()
+        display.show_header(shown_online)
+
+    # --------------------------------------------------------------
+    # Clock: NTP sync while the Link is up, repaint each second
+    # --------------------------------------------------------------
+
+    if shown_link and time.ticks_diff(now, next_ntp) >= 0:
+        try:
+            ntptime.settime()
+            next_ntp = time.ticks_add(now, NTP_OK_MS)
+            print("[Clock] synced")
+        except Exception as e:
+            next_ntp = time.ticks_add(now, NTP_RETRY_MS)
+            print("[Clock] NTP failed:", e)
+        now = time.ticks_ms()  # settime() blocks up to a second
+
+    local = local_time()
+    if local is not None:
+        local = local[:6]
+    if local != shown_clock:
+        shown_clock = local
+        display.show_clock(local)
 
     # --------------------------------------------------------------
     # Relay state dot (doubles as the Heartbeat)
@@ -221,7 +262,7 @@ while True:
 
         animation_frame += 1
 
-        if animation_frame >= 20:  # multiple of the dot's 4-frame flicker
+        if animation_frame >= 20:  # multiple of the dot's 10-frame blink
             animation_frame = 0
 
         next_animation = time.ticks_add(

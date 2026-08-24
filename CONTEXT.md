@@ -20,8 +20,8 @@ A full-screen view owned by one Capability. With one Capability there is one Pag
 _Avoid_: screen, dashboard, view
 
 **Wi-Fi Link**:
-What the one Page shows: the SSID the Terminal is joined to, its IP and its RSSI. When the Terminal is not joined to any known network the Page says so instead, and the Terminal keeps trying to join.
-_Avoid_: connection status, network info
+What the one Page shows: the SSID the Terminal is joined to, its IP and its RSSI. When the Terminal is not joined to any known network the Page says so instead, and the Terminal keeps trying to join. The word "Buddy" at the top of the Page is cyan while the Terminal reaches the internet and red while it does not — no link, or the latest Ping got nothing back. Not yet known counts as reachable.
+_Avoid_: connection status, network info, online/offline (the Page shows the colour, not the word)
 
 **Ping**:
 A line on the Page under the Wi-Fi Link showing round-trip quality to the internet: average time and jitter over the latest few probes, loss over a longer rolling window. Blank while the Terminal has no link; dashes when nothing comes back at all. Also shown on the Control Page.
@@ -52,5 +52,9 @@ The onboard RGB pixel, set to a colour or off from the Control Page or by a Send
 _Avoid_: Beacon (the old name — it used to mirror Claude's Status), RGB, light
 
 **Heartbeat**:
-A single dot in the bottom corner of the Page that blinks about once a second, its colour stepping red, green, blue. Says only that the firmware loop is alive; carries no data. If it freezes on one colour, the Terminal is hung.
-_Avoid_: animation, spinner, activity indicator
+A single dot in the top-right corner of the Page that blinks about once a second. Its colour is the Relay: green while joined, red while it cannot be reached; it holds steady yellow for a moment when something arrives from the Relay and steady blue when a Receipt goes back. If it freezes on green or red, the Terminal is hung.
+_Avoid_: animation, spinner, activity indicator, Relay dot (same thing, one name)
+
+**Clock**:
+The date and time on the bottom row of the Page, in Yangon time, ticking every second. Set from the internet once the Wi-Fi Link is up and refreshed every few hours; shows `--:--` until it has been set the first time. Keeps ticking while the Terminal is offline.
+_Avoid_: RTC, NTP (how it is set), timestamp

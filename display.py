@@ -21,16 +21,15 @@ LINE_2_Y = 56
 PING_X = 4 + 6 * 8  # after "Buddy" + one space, font.WIDTH = 8
 PING_Y = 4
 
-# Message area: below the Wi-Fi lines (Ping moved to the header, so it
-# starts on the old ping row), down to just above the Relay block.
+# Message area: below the Wi-Fi lines, down to just above the Clock row.
 MESSAGE_Y = 76
-MESSAGE_ROWS = 7  # 76 + 7*16 = 188, clears RELAY_Y = 192
+MESSAGE_ROWS = 8  # 76 + 8*16 = 204, clears CLOCK_Y = 208
 MESSAGE_COLS = 29
 
-# Relay block: bottom-left, Sub / Pub rows (state dot lives on the header).
-RELAY_Y = 192  # two rows stepped by font.HEIGHT
+# Clock: bottom row, "YYYY-MM-DD HH:MM:SS" in local time.
+CLOCK_Y = 208
 
-# Relay state dot: top-right corner, flickers ~2.5 Hz; colour = state.
+# Relay state dot: top-right corner, blinks 1 Hz; colour = state.
 # It doubles as the Heartbeat — a frozen dot means a hung loop.
 RELAY_DOT_X = TFT_WIDTH - 12
 RELAY_DOT_Y = 8
@@ -78,13 +77,16 @@ def link_lines(link):
 
     # ponytail: no "RSSI:" label — "dBm" already says it, and with the label
     # a 15-char IP overflows the 30 columns.
-    line2 = "IP: {} / {} dBm".format(ip, rssi_text)
+    line2 = "IP: {} / {:<4} dBm".format(ip, rssi_text)  # pad: see show_link
 
     return ("SSID: ", str(ssid), st7789.GREEN), line2
 
 
 class Display:
     def __init__(self):
+        self._clock_head = None  # show_clock: last drawn date+hh:mm
+        self._link_head = None  # show_link: last drawn (ssid, ip)
+
         # KEEP THE KNOWN-GOOD CONFIGURATION.
         self.spi = SPI(
             2,
@@ -130,18 +132,26 @@ class Display:
             color,
         )
 
-    def show_header(self):
-        self.text(
-            "Buddy",
-            4,
-            4,
-            st7789.CYAN,
-        )
+    def show_header(self, online=True):
+        """"Buddy": cyan while the internet is reachable, red while not."""
 
+        self.text("Buddy", 4, 4, st7789.CYAN if online else st7789.RED)
         self.line(24, st7789.WHITE)
 
     def show_link(self, link):
-        """Draw the Wi-Fi Link lines. Clears only its own two rows."""
+        """Draw the Wi-Fi Link lines. If only the RSSI moved since the last
+        draw, repaint just the "-46 dBm" cell; otherwise clear both rows."""
+
+        head = None if link is None else link[:2]  # (ssid, ip)
+
+        if link is not None and head == self._link_head:
+            rssi_text = "--" if link[2] is None else str(link[2])
+            x = 4 + len("IP: {} / ".format(link[1])) * font.WIDTH
+            # text() paints its own background; pad so "-46" over "-100" clears.
+            self.text("{:<4} dBm".format(rssi_text), x, LINE_2_Y)
+            return
+
+        self._link_head = head
 
         self.tft.fill_rect(
             0,
@@ -221,23 +231,37 @@ class Display:
         for i, line in enumerate(wrap(str(text), MESSAGE_COLS)[:MESSAGE_ROWS]):
             self.text(line, 4, MESSAGE_Y + i * font.HEIGHT, st7789.YELLOW)
 
-    def show_relay(self, sub, pub):
-        """Draw the Relay topic rows; state is the header dot (show_relay_dot)."""
+    def show_clock(self, local):
+        """Draw the Clock row. local: time tuple already offset, or None for
+        "--:--" before the first sync. Repaints only the cells that changed:
+        the seconds every tick, the rest once a minute."""
 
-        self.tft.fill_rect(0, RELAY_Y, TFT_WIDTH, 2 * font.HEIGHT, st7789.BLACK)
+        if local is None:
+            self.tft.fill_rect(0, CLOCK_Y, TFT_WIDTH, font.HEIGHT, st7789.BLACK)
+            self.text("--:--", 4, CLOCK_Y)
+            self._clock_head = None
+            return
 
-        self.text("Sub: " + sub, 4, RELAY_Y)
-        self.text("Pub: " + pub, 4, RELAY_Y + font.HEIGHT)
+        y, mo, d, h, mi, s = local[:6]
+        head = "{:04d}-{:02d}-{:02d} {:02d}:{:02d}:".format(y, mo, d, h, mi)
+
+        if head != self._clock_head:
+            self._clock_head = head
+            self.tft.fill_rect(0, CLOCK_Y, TFT_WIDTH, font.HEIGHT, st7789.BLACK)
+            self.text(head, 4, CLOCK_Y)
+
+        # text() paints its own background, so no clear for the seconds cell.
+        self.text("{:02d}".format(s), 4 + len(head) * font.WIDTH, CLOCK_Y)
 
     def show_relay_dot(self, frame, state):
         """Flickering Relay state dot, top-right of the header line.
 
-        state: "up" / "down" / "rx" / "tx". Flicker ~2.5 Hz so a short
-        rx/tx flash is never swallowed by an off phase; a frozen dot
-        means a hung loop.
+        state: "up" / "down" / "rx" / "tx". Blinks 1 Hz on up/down (a
+        frozen dot means a hung loop); rx/tx hold solid so the flash is
+        never swallowed by an off phase.
         """
 
-        on = frame % 4 < 2
+        on = state in ("rx", "tx") or frame % 10 < 5
         color = RELAY_DOT_COLORS[state]
         self.tft.fill_rect(
             RELAY_DOT_X, RELAY_DOT_Y, 8, 8, color if on else st7789.BLACK
