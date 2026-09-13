@@ -105,7 +105,7 @@ class Display:
             reset=Pin(TFT_RST, Pin.OUT),
             dc=Pin(TFT_DC, Pin.OUT),
             cs=Pin(TFT_CS, Pin.OUT),
-            rotation=0,
+            rotation=3,  # 90 degrees anticlockwise for sideways mounting.
             color_order=st7789.BGR,
         )
 
