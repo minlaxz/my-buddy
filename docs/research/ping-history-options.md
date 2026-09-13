@@ -113,6 +113,12 @@ This was documentation research and source inspection only. No packages were ins
 
 Before implementation, confirm the collector host can stay awake, whether WAN-outage recording is the priority, required offline retention, current broker ACL/plan/persistence, real firmware memory and timing budget, and whether exact raw-probe percentiles are needed. Acceptance should then exercise all-loss batches, Wi-Fi loss, WAN-only loss, collector/database downtime, duplicates, queue overflow, reboot, NTP failure/steps, tick rollover, and measured RTT bias during backfill.
 
+### Delivery verification
+
+The coordinator read the committed Markdown artifact and exercised all nine relative documentation/code links against the real repository. All resolved to existing files. Recalculation confirmed 18,000 nominal batches/day, 6,570,000/year, and 1,051,200 summaries/year at 30 seconds. The commit contained only this research note, leaving firmware and unrelated files unchanged. These checks establish a navigable, internally consistent research deliverable, not a functioning telemetry system.
+
+An independent follow-up request to the MathWorks licensing FAQ returned HTTP 403. Its advertised limits above rely on the research worker's successful retrieval, not a second independent retrieval. Treat plan terms as deployment-time checks. No device address, running collector, or deployed history UI was established during this research, so end-to-end ingestion, persistence, replay, and graphs were not exercised. Building or deploying that path would exceed the explicit instruction not to implement. Actual runtime superiority remains unverified. The recommendation reduces proposed components relative to the full dashboard stack, but no performance or reliability improvement has been measured.
+
 ## Official sources checked
 
 All sources below were retrieved on **2026-09-13**. Live documentation can change. `latest` and `master` pages describe their current documentation branches, not a verified installed version.
