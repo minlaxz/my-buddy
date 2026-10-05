@@ -2,7 +2,7 @@
 
 Raw lwIP ICMP socket, non-blocking, polled from the main loop each tick
 (ADR-0005: no blocking reads). One echo every SEND_MS spreads a batch of
-BATCH probes across the Page's 5 s cycle.
+BATCH probes across ~3 s, under the Page's 5 s cycle.
 
 ponytail: replies are reaped on the next loop tick, so RTTs read up to one
 tick period (~20 ms) high; timestamp in-payload if that ever matters.
@@ -12,8 +12,8 @@ import socket
 import struct
 import time
 
-SEND_MS = 1_600
-TIMEOUT_MS = 1_000
+SEND_MS = 1_000
+TIMEOUT_MS = 800
 BATCH = 3  # avg / jitter window: the latest batch
 WINDOW = 15  # loss%: rolling, ~5 batches
 IDENT = 0x4244  # "BD"; picks our echo replies out of the raw socket
