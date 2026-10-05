@@ -124,8 +124,9 @@ footer p{margin:0;overflow-wrap:anywhere}
   <dl class="kv">
     <dt>uptime</dt><dd id="up">—</dd>
     <dt>led</dt><dd id="lednow">off</dd>
+    <dt>history</dt><dd id="hist">—</dd>
   </dl>
-  <div class="row"><button class="danger" id="reboot">reboot</button></div>
+  <div class="row"><button id="push">push history</button><button class="danger" id="reboot">reboot</button></div>
 </section>
 
 <section id="connections">
@@ -133,6 +134,7 @@ footer p{margin:0;overflow-wrap:anywhere}
   <dl class="kv">
     <dt>link</dt><dd id="linkst">—</dd>
     <dt>relay</dt><dd id="relayst">—</dd>
+    <dt>mac</dt><dd id="macst">—</dd>
     <dt>topics</dt><dd id="topics">—</dd>
   </dl>
 </section>
@@ -200,7 +202,8 @@ function render(s){
   $('up').textContent=fmtUp(s.uptime_s);
   $('lednow').textContent=s.led||'off';
   const conn=(id,up)=>{const d=$(id);d.textContent=up?'up':'down';d.className=up?'up':'down'};
-  conn('linkst',!!l);conn('relayst',!!s.relay);
+  conn('linkst',!!l);conn('relayst',!!s.relay);conn('macst',!!s.mac);
+  $('hist').textContent=(s.history||0)+' batches on-device';
   $('topics').textContent=(s.topics&&s.topics.length)?s.topics.join(' · '):'—';
   document.querySelectorAll('.sw button').forEach(b=>b.setAttribute('aria-pressed',String((s.led||'off')===b.dataset.c)));
   $('foot').textContent='buddy · '+(l?l.ip:'no link')+' · up '+fmtUp(s.uptime_s)+' · micropython / esp32-s3';
@@ -214,6 +217,7 @@ $('bri').oninput=()=>$('briv').textContent=$('bri').value;
 async function led(btn,c){const r=await run(btn,()=>post('/led',{color:c,brightness:$('bri').value}));$('lednow').textContent=r;refresh()}
 $('setled').onclick=()=>led($('setled'),$('color').value);
 document.querySelectorAll('.sw button').forEach(b=>b.onclick=()=>{if(b.dataset.c!=='off')$('color').value=b.dataset.c;led(b,b.dataset.c)});
+$('push').onclick=async()=>{const r=await run($('push'),()=>post('/history/push',{}));toast(r);setTimeout(refresh,1500)};
 let armed=false;
 $('reboot').onclick=async()=>{
   if(!armed){armed=true;$('reboot').textContent='again to confirm';setTimeout(()=>{armed=false;$('reboot').textContent='reboot'},3000);return}

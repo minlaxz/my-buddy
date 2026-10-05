@@ -43,6 +43,10 @@ _Avoid_: publisher, client, hook
 What the Terminal sends back through the Relay the moment it shows a Message or sets the LED — an echo of what it rendered. A Sender waits a few seconds for it, so pushing a Message can tell the owner the desk unit really changed, not just that the Relay took it. Times out quietly when the Terminal is away; the last Message and LED still arrive later, the owner just did not get live word. Carries no state and is never held.
 _Avoid_: ack, acknowledgement, confirmation, publish, outbound topic
 
+**History**:
+The record of past Ping batches, shown as a graph in a browser on the owner's Mac. The Terminal keeps every batch it measures (in memory, then flash) and shows how many it is holding on the Page and the Control Page. The moment the Mac's recorder is listening it hands them all over through the Relay and the count drops to zero; a button on the Control Page asks for the same by hand. Gaps in the graph are honest: Terminal off, or its clock not yet set.
+_Avoid_: telemetry, log, time series, dashboard, buffer, queue
+
 **Message**:
 Text pushed to the Terminal from the Control Page or by a Sender through the Relay. Drawn on the Page under the Wi-Fi Link and stays there until replaced or cleared; it never interrupts anything and never times out.
 _Avoid_: notification (the old interrupting, timed thing), alert, popup

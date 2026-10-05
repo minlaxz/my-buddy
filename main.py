@@ -8,7 +8,8 @@ from display import display
 from web import WebServer
 from led import led
 from ping import Pinger
-from relay import Relay, TOPICS
+from history import History
+from relay import Relay, TOPICS, TOPIC_PING
 
 
 # How often the Page re-reads the Wi-Fi Link (SSID / IP / RSSI).
@@ -96,12 +97,27 @@ def status():
         "relay": relay.client is not None,
         "topics": [t.decode() for t in TOPICS] if relay.client else [],
         "ping": pinger.stats,
+        "history": history.count,
+        "mac": relay.mac_listening,
     }
 
 
+def push():
+    """Control Page button: (ok, text). The drain itself is the auto rule below."""
+
+    if relay.client is None:
+        return False, "Relay down"
+    if not relay.mac_listening:
+        return False, "Mac not listening"
+    if not history.count:
+        return True, "Nothing to push"
+    return True, "Pushing {}".format(history.count)
+
+
 pinger = Pinger(config.PING_TARGET)
+history = History()
 relay = Relay(display.show_message, led)
-web = WebServer(status, display.show_message, led)
+web = WebServer(status, display.show_message, led, push)
 
 
 def online():
@@ -123,6 +139,8 @@ def local_time():
 shown_online = True  # show_header() drew cyan
 shown_clock = None
 display.show_clock(None)
+shown_history = history.count
+display.show_history(shown_history)
 next_ntp = now  # first sync as soon as the link is up
 
 if shown_link:
@@ -182,11 +200,15 @@ while True:
             print("[Display]", link if link else "Disconnected")
 
     # --------------------------------------------------------------
-    # Ping: probe while the Link is up, repaint when a batch lands
+    # Ping: probe while the Link is up; repaint and record the batch
+    # when one lands
     # --------------------------------------------------------------
 
     if shown_link and pinger.poll(now):
         display.show_ping(pinger.stats)
+        history.record(pinger.stats)
+
+    history.poll(now)
 
     web.poll()
 
@@ -202,7 +224,23 @@ while True:
         now = time.ticks_ms()
         next_animation = now
 
+    # --------------------------------------------------------------
+    # History: drain one chunk per tick while the Mac is listening.
+    # A chunk already handed to the socket when the Relay drops is
+    # lost (<= CHUNK records); the rest goes back to the store.
+    # --------------------------------------------------------------
+
+    if relay.client and relay.mac_listening:
+        if history.count and not relay.pending:
+            relay.publish(TOPIC_PING, history.next_chunk())
+    elif history.pending:
+        history.abort()
+
     relay.poll()
+
+    if history.count != shown_history:
+        shown_history = history.count
+        display.show_history(shown_history)
 
     # --------------------------------------------------------------
     # "Buddy" colour: internet reach

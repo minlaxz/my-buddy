@@ -79,6 +79,20 @@ def content_length(data):
     return 0
 
 
+def ping_json(stats):
+    """Ping stats as JSON: shared by GET /status and the History batch on the Relay."""
+
+    if not stats:
+        return "null"
+
+    avg, loss, jitter = stats
+    return '{{"avg_ms":{},"loss_pct":{},"jitter_ms":{}}}'.format(
+        "null" if avg is None else avg,
+        loss,
+        "null" if jitter is None else jitter,
+    )
+
+
 def json_status(status):
     link = status.get("link")
 
@@ -90,42 +104,37 @@ def json_status(status):
     else:
         link_json = "null"
 
-    ping = status.get("ping")
-
-    if ping:
-        avg, loss, jitter = ping
-        ping_json = '{{"avg_ms":{},"loss_pct":{},"jitter_ms":{}}}'.format(
-            "null" if avg is None else avg,
-            loss,
-            "null" if jitter is None else jitter,
-        )
-    else:
-        ping_json = "null"
-
     led = status.get("led")
 
     topics = ",".join('"{}"'.format(t) for t in status.get("topics", ()))
 
-    return '{{"link":{},"ping":{},"uptime_s":{},"led":{},"relay":{},"topics":[{}]}}'.format(
+    return (
+        '{{"link":{},"ping":{},"uptime_s":{},"led":{},"relay":{},"topics":[{}],'
+        '"history":{},"mac":{}}}'
+    ).format(
         link_json,
-        ping_json,
+        ping_json(status.get("ping")),
         status.get("uptime_s"),
         '"{}"'.format(led) if led else "null",
         "true" if status.get("relay") else "false",
         topics,
+        status.get("history", 0),
+        "true" if status.get("mac") else "false",
     )
 
 
 class WebServer:
     """Tiny HTTP/1.0 server polled from the main loop. One request per poll."""
 
-    def __init__(self, status, on_message, led):
-        # status: callable returning {"link": (ssid, ip, rssi) | None, "uptime_s": int, "led": str | None}
+    def __init__(self, status, on_message, led, on_push):
+        # status: callable returning {"link": (ssid, ip, rssi) | None, "uptime_s": int, "led": str | None, ...}
         # on_message: callable(text) that puts a Message on the Page
         # led: led.Led
+        # on_push: callable() -> (ok, text): check the History can drain now
         self.status = status
         self.on_message = on_message
         self.led = led
+        self.on_push = on_push
         self.reboot_pending = False
 
         self.sock = socket.socket()
@@ -214,6 +223,11 @@ class WebServer:
 
             self.led.set(rgb, brightness)
             return "200 OK", "text/plain", self.led.color
+
+        if method == "POST" and path == "/history/push":
+            ok, text = self.on_push()
+            print("[Web] History push:", text)
+            return ("200 OK" if ok else "409 Conflict"), "text/plain", text
 
         if method == "POST" and path == "/reboot":
             # Answer first, reset after the socket is closed.

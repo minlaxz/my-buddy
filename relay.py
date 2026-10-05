@@ -11,7 +11,9 @@ from led import parse_color
 
 TOPIC_MESSAGE = b"bud/msg"
 TOPIC_LED = b"bud/led"
-TOPICS = (TOPIC_MESSAGE, TOPIC_LED)
+TOPIC_HISTORY = b"bud/history"  # retained on/off: the Mac's recorder is listening
+TOPICS = (TOPIC_MESSAGE, TOPIC_LED, TOPIC_HISTORY)
+TOPIC_PING = b"bud/ping"  # History records go out here, outbound only
 
 CA_FILE = "lib/isrg-root-x1.pem"  # Let's Encrypt root; HiveMQ Cloud chains to it.
 
@@ -20,7 +22,7 @@ PING_MS = 30_000
 
 
 def parse_payload(topic, msg):
-    """('message', text) / ('led', rgb-or-None) / None for unknown topic."""
+    """('message', text) / ('led', rgb-or-None) / ('history', listening) / None."""
 
     text = msg.decode("utf-8", "ignore").strip() if isinstance(msg, bytes) else str(msg).strip()
 
@@ -29,6 +31,9 @@ def parse_payload(topic, msg):
 
     if topic == TOPIC_LED:
         return ("led", None if text.lower() == "off" else parse_color(text))
+
+    if topic == TOPIC_HISTORY:
+        return ("history", text.lower() == "on")
 
     return None
 
@@ -41,7 +46,8 @@ class Relay:
         self.led = led
         self.client = None
         self.next_ping = 0
-        self.pending_ack = None  # (ack_topic, payload) set on render, sent by poll()
+        self.pending = []  # (topic, payload) queued by publish(), sent by poll()
+        self.mac_listening = False  # retained bud/history; False again on a drop
         self.rx_at = None  # ticks_ms of the last receive / ack send, for the
         self.tx_at = None  # Relay state dot's flashes
 
@@ -79,6 +85,12 @@ class Relay:
         print("[Relay] connected to", MQTT_HOST)
         return True
 
+    def publish(self, topic, payload):
+        """Queue a non-retained publish for the next poll(). Dropped while the Relay is down."""
+
+        if self.client is not None:
+            self.pending.append((topic, payload))
+
     def poll(self):
         if self.client is None:
             return
@@ -86,12 +98,11 @@ class Relay:
         try:
             self.client.check_msg()
 
-            # Receipt: publish after check_msg() returns, never on the socket
+            # Publish after check_msg() returns, never on the socket
             # mid-receive. Non-retained so a fresh subscriber never sees a
-            # stale ack; nobody's listening on a reconnect replay, harmless.
-            if self.pending_ack is not None:
-                topic, payload = self.pending_ack
-                self.pending_ack = None
+            # stale ack or batch; nobody's listening on a reconnect replay.
+            while self.pending:
+                topic, payload = self.pending.pop(0)
                 self.client.publish(topic, payload, retain=False)
                 self.tx_at = time.ticks_ms()
 
@@ -101,7 +112,8 @@ class Relay:
         except OSError as e:
             print("[Relay] dropped:", e)
             self.client = None
-            self.pending_ack = None
+            self.pending = []
+            self.mac_listening = False
 
     def _on_publish(self, topic, msg):
         self.rx_at = time.ticks_ms()
@@ -112,6 +124,11 @@ class Relay:
             return
 
         kind, value = parsed
+
+        if kind == "history":
+            self.mac_listening = value
+            print("[Relay] mac:", "listening" if value else "away")
+            return  # a flag, not something rendered: no Receipt
 
         if kind == "message":
             self.on_message(value)
@@ -127,4 +144,4 @@ class Relay:
             rendered = self.led.color or "off"
 
         # Receipt: echo what was rendered on <topic>/ack (sent by poll()).
-        self.pending_ack = (topic + b"/ack", rendered.encode())
+        self.publish(topic + b"/ack", rendered.encode())

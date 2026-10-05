@@ -1,0 +1,17 @@
+# Ping History is held on the Terminal and drained over the Relay when the Mac listens
+
+Status: accepted, 2026-10-05. Follows the comparison in `docs/research/ping-history-options.md`.
+
+The owner wants to look back at Ping quality over hours and days. The Page shows only the latest batch and `GET /status` is a snapshot, so each batch has to leave the Terminal and land somewhere durable — and the Mac that keeps the graph is not always awake.
+
+**The Terminal holds every batch until the Mac is listening.** `history.py` packs each landed batch into 9 bytes (unix seconds, avg, loss, jitter) in RAM and appends to `history.bin` every 5 minutes; a power cut loses at most that. The board has 8 MB PSRAM and 14 MB free flash, a week of batches is ~1.8 MB, so the cap is a week and the oldest half goes when it is hit. Recording waits for the Clock: a batch with no honest timestamp is not worth keeping, and NTP lands within seconds of the link anyway.
+
+**The Mac says when it is listening.** `history.sh` publishes retained `bud/history` = `on` when it starts, with an MQTT will (and an exit trap) that flips it to `off`. The Terminal subscribes to it beside Message and LED. The Relay itself being up says nothing about the Mac — the broker forwards non-retained publishes to nobody just as happily — so this flag is the only "is anyone there" the Terminal has. A `push history` button on the Control Page asks the same question by hand and answers `Relay down`, `Mac not listening`, `Nothing to push` or `Pushing N`; the drain itself is the automatic rule.
+
+**Drain in chunks, one per loop tick.** While the Relay is up and the flag is on, the main loop publishes 50 records (~1.1 KB JSON array) per tick on `bud/ping` until the count is zero, then each new batch as it lands. A day of backlog is ~580 publishes, under a minute. On the Mac `mosquitto_sub -F %J` appends each chunk as one JSON line to `~/.local/share/buddy/ping.jsonl`; `history.html` flattens the arrays, sorts by the Terminal's timestamp, and draws round trip, jitter and loss with Chart.js, breaking the line across gaps over 60 s. The count shows on the Page (right end of the Clock row, "N held") and the Control Page.
+
+**Broker side.** `terminal` publishes `bud/ping` and subscribes `bud/history`; `sender` (the Mac) subscribes `bud/ping` and publishes `bud/history`. ADR-0006 documented `terminal` as publishing only `bud/+/ack`; the first `bud/ping` publish went through unchanged, so the broker is not enforcing that today.
+
+Accepted limits, each with its upgrade if it ever bites: a chunk already handed to the socket when the Relay drops is lost, at most 50 records (publish QoS 1 and advance the store on PUBACK); the measurement shares the WAN it measures, so an internet outage is a gap, not a run of 100 % loss (a LAN collector over HTTP, option 2 in the research note); the JSONL grows ~30 MB a year (SQLite, or rotate); draining 50 records per tick runs beside the Pinger, so RTTs during a long drain read high.
+
+Rejected: polling `GET /status` from the Mac (misses and duplicates batches, pull not record); QoS 1 with a persistent broker session instead of on-device storage (HiveMQ's queue is far shorter than a night, and the Terminal has the room); Telegraf/InfluxDB/Grafana (three services for one chart); ThingSpeak (15 s free interval is slower than the batch rate, and a hosted sink shares the WAN failure too).

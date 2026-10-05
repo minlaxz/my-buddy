@@ -26,8 +26,10 @@ MESSAGE_Y = 76
 MESSAGE_ROWS = 8  # 76 + 8*16 = 204, clears CLOCK_Y = 208
 MESSAGE_COLS = 29
 
-# Clock: bottom row, "YYYY-MM-DD HH:MM:SS" in local time.
+# Clock: bottom row, "YYYY-MM-DD HH:MM:SS" in local time; the History count
+# ("12345 held") sits right-aligned on the same row, from HISTORY_X on.
 CLOCK_Y = 208
+HISTORY_X = 4 + 19 * 8 + 4
 
 # Relay state dot: top-right corner, blinks 1 Hz; colour = state.
 # It doubles as the Heartbeat — a frozen dot means a hung loop.
@@ -237,7 +239,7 @@ class Display:
         the seconds every tick, the rest once a minute."""
 
         if local is None:
-            self.tft.fill_rect(0, CLOCK_Y, TFT_WIDTH, font.HEIGHT, st7789.BLACK)
+            self.tft.fill_rect(0, CLOCK_Y, HISTORY_X, font.HEIGHT, st7789.BLACK)
             self.text("--:--", 4, CLOCK_Y)
             self._clock_head = None
             return
@@ -247,11 +249,23 @@ class Display:
 
         if head != self._clock_head:
             self._clock_head = head
-            self.tft.fill_rect(0, CLOCK_Y, TFT_WIDTH, font.HEIGHT, st7789.BLACK)
+            self.tft.fill_rect(0, CLOCK_Y, HISTORY_X, font.HEIGHT, st7789.BLACK)
             self.text(head, 4, CLOCK_Y)
 
         # text() paints its own background, so no clear for the seconds cell.
         self.text("{:02d}".format(s), 4 + len(head) * font.WIDTH, CLOCK_Y)
+
+    def show_history(self, count):
+        """Draw the History count at the right end of the Clock row."""
+
+        text = "{} held".format(min(count, 99999))
+        self.tft.fill_rect(HISTORY_X, CLOCK_Y, TFT_WIDTH - HISTORY_X, font.HEIGHT, st7789.BLACK)
+        self.text(
+            text,
+            TFT_WIDTH - 4 - len(text) * font.WIDTH,
+            CLOCK_Y,
+            st7789.YELLOW if count else st7789.WHITE,
+        )
 
     def show_relay_dot(self, frame, state):
         """Flickering Relay state dot, top-right of the header line.
