@@ -13,6 +13,9 @@
 #
 # One JSON line per chunk, rows timestamped by the Terminal (unix s):
 #   {"tst":"...","topic":"bud/ping",...,"payload":[[1759600000,12,0,3],...]}
+#
+# The page's "clear" buttons POST /clear to history_server.py, which rewrites
+# the file in place without the chosen range.
 
 set -euo pipefail
 
@@ -33,7 +36,7 @@ MQ=(-h "$MQTT_HOST" -p 8883 --cafile "$HERE/lib/isrg-root-x1.pem" -u "$MQTT_USER
 mosquitto_sub "${MQ[@]}" -i buddy-history -t bud/ping -F %J \
   --will-topic bud/history --will-payload off --will-retain >>"$DATA/ping.jsonl" &
 SUB=$!
-python3 -m http.server -d "$DATA" -b 127.0.0.1 8000 >/dev/null 2>&1 &
+python3 "$HERE/history_server.py" "$DATA" 8000 &
 SRV=$!
 trap 'kill $SUB $SRV 2>/dev/null; mosquitto_pub "${MQ[@]}" -r -t bud/history -m off' EXIT
 

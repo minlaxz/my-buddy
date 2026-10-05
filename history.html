@@ -19,6 +19,11 @@ button[aria-pressed=true]{color:var(--ok);border-color:var(--ok)}
 canvas{width:100%!important;height:220px!important}
 .stat{display:flex;gap:24px;color:var(--dim)}
 .stat b{color:var(--ink);font-weight:600}
+.readout{min-height:1.4em;color:var(--dim);margin:0 0 8px}
+.readout b{color:var(--ink);font-weight:600}
+#clear button{color:var(--dim)}
+#clear button[data-armed]{color:var(--bad);border-color:var(--bad)}
+.lbl{color:var(--dim);margin-right:4px}
 </style>
 <main>
 <h1>buddy · Ping history</h1>
@@ -27,6 +32,8 @@ canvas{width:100%!important;height:220px!important}
   <button data-h="1">1h</button><button data-h="6">6h</button><button data-h="24" aria-pressed="true">24h</button><button data-h="0">all</button>
   <span class="stat" id="stat"></span>
 </div>
+<div class="row"><span class="lbl">clear last</span><span id="clear"><button data-h="1">1h</button> <button data-h="6">6h</button> <button data-h="24">24h</button> <button data-h="0">all</button></span></div>
+<p class="readout" id="readout">hover a chart for the values at that moment</p>
 <div class="card"><h2>round trip, ms (avg · jitter range) — gap = whole batch lost, Terminal off, or clock not yet synced</h2><canvas id="rtt"></canvas></div>
 <div class="card"><h2>loss %, rolling 15 echoes</h2><canvas id="loss"></canvas></div>
 </main>
@@ -39,10 +46,26 @@ const fmt=ms=>{const d=new Date(ms);return spanMs<3600e3?d.toLocaleTimeString([]
 // fresh options per chart: Chart.js mutates scales in place, so no sharing
 const opts=()=>({animation:false,responsive:true,maintainAspectRatio:false,parsing:false,normalized:true,
   interaction:{mode:'nearest',intersect:false},
-  plugins:{legend:{labels:{color:css('--dim'),boxWidth:10}},tooltip:{callbacks:{title:i=>new Date(i[0].parsed.x).toLocaleString()}}},
+  plugins:{legend:{labels:{color:css('--dim'),boxWidth:10}},tooltip:{enabled:false}},
   scales:{x:{type:'linear',ticks:{color:css('--dim'),maxTicksLimit:8,callback:fmt},grid:{color:css('--line')}},
           y:{beginAtZero:true,ticks:{color:css('--dim')},grid:{color:css('--line')}}}});
-const mk=(id,sets)=>new Chart($(id),{type:'line',options:opts(),data:{datasets:sets}});
+// crosshair: one vertical bar on both charts at the hovered time, values in #readout
+let hoverT=null,cur=[];
+Chart.register({id:'cross',afterDraw(c){
+  if(hoverT==null)return;const x=c.scales.x.getPixelForValue(hoverT),a=c.chartArea;
+  if(x<a.left||x>a.right)return;
+  const g=c.ctx;g.save();g.strokeStyle=css('--ink');g.lineWidth=1;g.setLineDash([4,3]);
+  g.beginPath();g.moveTo(x,a.top);g.lineTo(x,a.bottom);g.stroke();g.restore()}});
+const nearest=t=>{let lo=0,hi=cur.length-1;if(hi<0)return null;
+  while(lo<hi){const m=(lo+hi)>>1;cur[m].t<t?lo=m+1:hi=m}
+  return lo>0&&t-cur[lo-1].t<cur[lo].t-t?cur[lo-1]:cur[lo]};
+function hover(c,e){
+  if(e==null){hoverT=null;$('readout').textContent='hover a chart for the values at that moment'}
+  else{const r=nearest(c.scales.x.getValueForPixel(e.offsetX));if(!r)return;hoverT=r.t;
+    $('readout').innerHTML=`<b>${new Date(r.t).toLocaleString()}</b> · `+(r.avg_ms==null?'<b>batch lost</b>':`avg <b>${r.avg_ms}</b> ms · jitter <b>${r.jitter_ms}</b> ms`)+` · loss <b>${r.loss_pct}</b> %`}
+  rtt.draw();loss.draw()}
+const mk=(id,sets)=>{const c=new Chart($(id),{type:'line',options:opts(),data:{datasets:sets}});
+  c.canvas.addEventListener('mousemove',e=>hover(c,e));c.canvas.addEventListener('mouseleave',()=>hover(c,null));return c};
 const ds=(label,color,extra={})=>({label,borderColor:color,backgroundColor:color,borderWidth:1.5,pointRadius:0,spanGaps:false,data:[],...extra});
 const rtt=mk('rtt',[ds('avg',css('--ok')),ds('jitter',css('--warn'),{borderDash:[3,3]})]);
 const loss=mk('loss',[ds('loss %',css('--bad'),{stepped:true,fill:true,backgroundColor:css('--bad')+'22'})]);
@@ -60,7 +83,7 @@ async function load(){
 }
 function draw(){
   const since=hours?Date.now()-hours*3600e3:0;
-  const v=rows.filter(r=>r.t>=since);
+  const v=rows.filter(r=>r.t>=since);cur=v;
   // break the line across gaps > 60 s (Terminal away, Wi-Fi down, collector off)
   const pts=key=>{const out=[];let prev=0;for(const r of v){if(prev&&r.t-prev>60e3)out.push({x:prev+1,y:null});out.push({x:r.t,y:r[key]});prev=r.t}return out};
   rtt.data.datasets[0].data=pts('avg_ms');rtt.data.datasets[1].data=pts('jitter_ms');loss.data.datasets[0].data=pts('loss_pct');
@@ -75,5 +98,9 @@ function draw(){
 }
 $('range').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;hours=+b.dataset.h;
   for(const x of $('range').querySelectorAll('button'))x.setAttribute('aria-pressed',x===b);draw()});
+$('clear').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
+  if(!b.dataset.armed){b.dataset.armed=1;b.textContent='again?';setTimeout(()=>{delete b.dataset.armed;b.textContent=b.dataset.h==='0'?'all':b.dataset.h+'h'},3000);return}
+  delete b.dataset.armed;b.textContent=b.dataset.h==='0'?'all':b.dataset.h+'h';
+  const r=await fetch('/clear?hours='+b.dataset.h,{method:'POST'});$('readout').textContent='cleared · '+await r.text();load()});
 load();setInterval(load,30e3);
 </script>
