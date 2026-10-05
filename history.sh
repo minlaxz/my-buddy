@@ -15,7 +15,8 @@
 #   {"tst":"...","topic":"bud/ping",...,"payload":[[1759600000,12,0,3],...]}
 #
 # The page's "clear" buttons POST /clear to history_server.py, which rewrites
-# the file in place without the chosen range.
+# the file in place without the chosen range. Rows older than 6 months are
+# dropped at start and once a day.
 
 set -euo pipefail
 
