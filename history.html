@@ -24,16 +24,21 @@ canvas{width:100%!important;height:220px!important}
 #clear button{color:var(--dim)}
 #clear button[data-armed]{color:var(--bad);border-color:var(--bad)}
 .lbl{color:var(--dim);margin:0 4px}
+#save{margin-left:auto}
+.legend{display:flex;gap:24px;color:var(--dim);margin:0}
+.legend b{color:var(--ink);font-weight:600}
+.sw{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
 select{background:var(--bg);color:var(--ok);border:1px solid var(--line);padding:4px 6px;font:inherit}
 </style>
 <main>
 <h1>buddy · Ping history</h1>
 <p class="sub">batches (3 echoes to 8.8.8.8) averaged per interval, timestamped by the Terminal · refreshes every 30 s · rows older than 6 months are dropped</p>
-<div class="row"><span id="range"></span><span class="lbl">every</span><select id="step"></select><span class="stat" id="stat"></span></div>
+<div class="row"><span id="range"></span><span class="lbl">every</span><select id="step"></select><span class="stat" id="stat"></span><button id="save">save PNG</button></div>
 <div class="row"><span class="lbl">clear last</span><span id="clear"><button data-h="1">1h</button> <button data-h="6">6h</button> <button data-h="24">24h</button> <button data-h="0">all</button></span></div>
 <p class="readout" id="readout">hover a chart for the values at that moment</p>
 <div class="card"><h2>round trip, ms (avg · jitter range) — gap = whole batch lost, Terminal off, or clock not yet synced</h2><canvas id="rtt"></canvas></div>
 <div class="card"><h2>loss %, rolling 15 echoes</h2><canvas id="loss"></canvas></div>
+<p class="legend" id="legend"></p>
 </main>
 <script>
 const $=id=>document.getElementById(id);
@@ -41,14 +46,14 @@ const $=id=>document.getElementById(id);
 const RANGES=[['15m',15],['30m',30],['1h',60],['3h',180],['6h',360],['12h',720],['24h',1440],['3d',4320],['1w',10080]];
 const STEPS=m=>m<=60?{s:[5,10,15,30,60],d:10}:m<=720?{s:[60,180,300,600],d:60}:{s:[1800,3600,10800,21600],d:1800};
 const lbl=s=>s<60?s+'s':s<3600?s/60+'m':s/3600+'h';
-let mins=1440, step=1800, rows=[];
+let mins=1440, step=1800, rows=[], legend=[];  // legend: [color, text] shared by the page footer and the PNG
 const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 let spanMs=0;
 const fmt=ms=>{const d=new Date(ms);return spanMs<3600e3?d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'}):spanMs<=86400e3?d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):d.toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})};
 // fresh options per chart: Chart.js mutates scales in place, so no sharing
 const opts=()=>({animation:false,responsive:true,maintainAspectRatio:false,parsing:false,normalized:true,
   interaction:{mode:'nearest',intersect:false},
-  plugins:{legend:{labels:{color:css('--dim'),boxWidth:10}},tooltip:{enabled:false}},
+  plugins:{legend:{display:false},tooltip:{enabled:false}},
   scales:{x:{type:'linear',ticks:{color:css('--dim'),maxTicksLimit:8,callback:fmt},grid:{color:css('--line')}},
           y:{beginAtZero:true,ticks:{color:css('--dim')},grid:{color:css('--line')}}}});
 // crosshair: one vertical bar on both charts at the hovered time, values in #readout
@@ -96,12 +101,27 @@ function draw(){
   rtt.data.datasets[0].data=pts('avg_ms');rtt.data.datasets[1].data=pts('jitter_ms');loss.data.datasets[0].data=pts('loss_pct');
   spanMs=now-since;
   for(const c of [rtt,loss]){Object.assign(c.options.scales.x,{min:since,max:now});c.update()}
-  const ok=v.filter(r=>r.avg_ms!=null);
-  const avg=ok.length?Math.round(ok.reduce((s,r)=>s+r.avg_ms,0)/ok.length):'–';
-  const worst=ok.length?ok.reduce((m,r)=>r.avg_ms>m?r.avg_ms:m,0):'–';
+  const ok=v.filter(r=>r.avg_ms!=null),mean=(a,k)=>a.length?Math.round(a.reduce((s,r)=>s+r[k],0)/a.length):'–';
+  const avg=mean(ok,'avg_ms'),worst=ok.length?ok.reduce((m,r)=>r.avg_ms>m?r.avg_ms:m,0):'–';
   const lost=v.filter(r=>r.avg_ms==null).length;
-  $('stat').innerHTML=`<span>batches <b>${v.length}</b></span><span>avg <b>${avg}</b> ms</span><span>worst <b>${worst}</b> ms</span><span>all-lost <b>${lost}</b></span>`;
+  $('stat').innerHTML=`<span>batches <b>${v.length}</b></span><span>worst <b>${worst}</b> ms</span><span>all-lost <b>${lost}</b></span>`;
+  legend=[[css('--ok'),`avg ${avg} ms`],[css('--warn'),`jitter ${mean(ok,'jitter_ms')} ms`],[css('--bad'),`loss ${mean(v,'loss_pct')} %`]];
+  $('legend').innerHTML=legend.map(([c,t])=>`<span><i class="sw" style="background:${c}"></i>${t.replace(/ (\S+) /,' <b>$1</b> ')}</span>`).join('');
 }
+// PNG: title, both charts, legend with the range's averages at the bottom
+function savePng(){
+  const k=devicePixelRatio||1,P=16*k,F=13*k,o=document.createElement('canvas'),g=o.getContext('2d');
+  const range=RANGES.find(r=>r[1]===mins)[0],now=new Date(),from=new Date(now-mins*60e3);
+  o.width=rtt.canvas.width+2*P;o.height=rtt.canvas.height+loss.canvas.height+P*4+F*5.2;
+  g.fillStyle=css('--bg');g.fillRect(0,0,o.width,o.height);
+  g.font=`${F}px "JetBrains Mono",ui-monospace,monospace`;g.textBaseline='top';
+  let y=P;g.fillStyle=css('--ink');g.fillText(`buddy · Ping · last ${range}, one point every ${lbl(step)} · ${from.toLocaleString()} – ${now.toLocaleString()}`,P,y);y+=F*1.8;
+  for(const [c,h] of [[rtt,'round trip, ms (avg · jitter)'],[loss,'loss %, rolling 15 echoes']]){
+    g.fillStyle=css('--dim');g.fillText(h,P,y);y+=F*1.4;g.drawImage(c.canvas,P,y);y+=c.canvas.height+P}
+  let x=P;for(const [c,t] of legend){g.fillStyle=c;g.fillRect(x,y+F*.2,F*.7,F*.7);x+=F*1.2;g.fillStyle=css('--ink');g.fillText(t,x,y);x+=g.measureText(t).width+F*2}
+  o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download=`ping-${range}-${lbl(step)}-${now.toISOString().slice(0,16).replace('T','-').replace(':','')}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1e3)})}
+$('save').addEventListener('click',savePng);
 function setRange(m){mins=m;const {s,d}=STEPS(m);step=d;
   $('range').innerHTML=RANGES.map(([l,x])=>`<button data-m="${x}" aria-pressed="${x===m}">${l}</button>`).join('');
   $('step').innerHTML=s.map(x=>`<option value="${x}"${x===d?' selected':''}>${lbl(x)}</option>`).join('');draw()}
