@@ -110,7 +110,7 @@ def json_status(status):
 
     return (
         '{{"link":{},"ping":{},"uptime_s":{},"led":{},"relay":{},"topics":[{}],'
-        '"history":{},"mac":{}}}'
+        '"history":{},"holding":{},"mac":{}}}'
     ).format(
         link_json,
         ping_json(status.get("ping")),
@@ -119,6 +119,7 @@ def json_status(status):
         "true" if status.get("relay") else "false",
         topics,
         status.get("history", 0),
+        "true" if status.get("holding") else "false",
         "true" if status.get("mac") else "false",
     )
 
@@ -126,15 +127,17 @@ def json_status(status):
 class WebServer:
     """Tiny HTTP/1.0 server polled from the main loop. One request per poll."""
 
-    def __init__(self, status, on_message, led, on_push):
+    def __init__(self, status, on_message, led, on_push, on_hold):
         # status: callable returning {"link": (ssid, ip, rssi) | None, "uptime_s": int, "led": str | None, ...}
         # on_message: callable(text) that puts a Message on the Page
         # led: led.Led
         # on_push: callable() -> (ok, text): check the History can drain now
+        # on_hold: callable(bool) -> text: pause / resume holding batches
         self.status = status
         self.on_message = on_message
         self.led = led
         self.on_push = on_push
+        self.on_hold = on_hold
         self.reboot_pending = False
 
         self.sock = socket.socket()
@@ -228,6 +231,11 @@ class WebServer:
             ok, text = self.on_push()
             print("[Web] History push:", text)
             return ("200 OK" if ok else "409 Conflict"), "text/plain", text
+
+        if method == "POST" and path == "/history/hold":
+            text = self.on_hold(form.get("state", "on") != "off")
+            print("[Web] History hold:", text)
+            return "200 OK", "text/plain", text
 
         if method == "POST" and path == "/reboot":
             # Answer first, reset after the socket is closed.

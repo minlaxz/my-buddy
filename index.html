@@ -126,7 +126,7 @@ footer p{margin:0;overflow-wrap:anywhere}
     <dt>led</dt><dd id="lednow">off</dd>
     <dt>history</dt><dd id="hist">—</dd>
   </dl>
-  <div class="row"><button id="push">push history</button><button class="danger" id="reboot">reboot</button></div>
+  <div class="row"><button id="push">push history</button><button id="hold">pause holding</button><button class="danger" id="reboot">reboot</button></div>
 </section>
 
 <section id="connections">
@@ -203,7 +203,8 @@ function render(s){
   $('lednow').textContent=s.led||'off';
   const conn=(id,up)=>{const d=$(id);d.textContent=up?'up':'down';d.className=up?'up':'down'};
   conn('linkst',!!l);conn('relayst',!!s.relay);conn('macst',!!s.mac);
-  $('hist').textContent=(s.history||0)+' batches on-device';
+  $('hist').textContent=(s.history||0)+' batches on-device'+(s.holding?'':' · paused');
+  holding=!!s.holding;$('hold').textContent=holding?'pause holding':'resume holding';
   $('topics').textContent=(s.topics&&s.topics.length)?s.topics.join(' · '):'—';
   document.querySelectorAll('.sw button').forEach(b=>b.setAttribute('aria-pressed',String((s.led||'off')===b.dataset.c)));
   $('foot').textContent='buddy · '+(l?l.ip:'no link')+' · up '+fmtUp(s.uptime_s)+' · micropython / esp32-s3';
@@ -218,6 +219,8 @@ async function led(btn,c){const r=await run(btn,()=>post('/led',{color:c,brightn
 $('setled').onclick=()=>led($('setled'),$('color').value);
 document.querySelectorAll('.sw button').forEach(b=>b.onclick=()=>{if(b.dataset.c!=='off')$('color').value=b.dataset.c;led(b,b.dataset.c)});
 $('push').onclick=async()=>{const r=await run($('push'),()=>post('/history/push',{}));toast(r);setTimeout(refresh,1500)};
+let holding=true;
+$('hold').onclick=async()=>{const r=await run($('hold'),()=>post('/history/hold',{state:holding?'off':'on'}));toast(r);refresh()};
 let armed=false;
 $('reboot').onclick=async()=>{
   if(!armed){armed=true;$('reboot').textContent='again to confirm';setTimeout(()=>{armed=false;$('reboot').textContent='reboot'},3000);return}

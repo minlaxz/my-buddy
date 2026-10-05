@@ -255,10 +255,11 @@ class Display:
         # text() paints its own background, so no clear for the seconds cell.
         self.text("{:02d}".format(s), 4 + len(head) * font.WIDTH, CLOCK_Y)
 
-    def show_history(self, count):
-        """Draw the History count at the right end of the Clock row."""
+    def show_history(self, count, holding=True):
+        """Draw the History count at the right end of the Clock row;
+        "paused" while the Control Page has holding off (count on the Control Page)."""
 
-        text = "{} held".format(min(count, 99999))
+        text = "{} held".format(min(count, 99999)) if holding else "paused"
         self.tft.fill_rect(HISTORY_X, CLOCK_Y, TFT_WIDTH - HISTORY_X, font.HEIGHT, st7789.BLACK)
         self.text(
             text,

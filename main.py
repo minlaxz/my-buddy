@@ -98,6 +98,7 @@ def status():
         "topics": [t.decode() for t in TOPICS] if relay.client else [],
         "ping": pinger.stats,
         "history": history.count,
+        "holding": history.enabled,
         "mac": relay.mac_listening,
     }
 
@@ -114,10 +115,17 @@ def push():
     return True, "Pushing {}".format(history.count)
 
 
+def hold(on):
+    """Control Page toggle: hold new batches or let them go."""
+
+    history.enabled = on
+    return "Holding" if on else "Paused"
+
+
 pinger = Pinger(config.PING_TARGET)
 history = History()
 relay = Relay(display.show_message, led)
-web = WebServer(status, display.show_message, led, push)
+web = WebServer(status, display.show_message, led, push, hold)
 
 
 def online():
@@ -139,8 +147,8 @@ def local_time():
 shown_online = True  # show_header() drew cyan
 shown_clock = None
 display.show_clock(None)
-shown_history = history.count
-display.show_history(shown_history)
+shown_history = (history.count, history.enabled)
+display.show_history(*shown_history)
 next_ntp = now  # first sync as soon as the link is up
 
 if shown_link:
@@ -238,9 +246,9 @@ while True:
 
     relay.poll()
 
-    if history.count != shown_history:
-        shown_history = history.count
-        display.show_history(shown_history)
+    if (history.count, history.enabled) != shown_history:
+        shown_history = (history.count, history.enabled)
+        display.show_history(*shown_history)
 
     # --------------------------------------------------------------
     # "Buddy" colour: internet reach

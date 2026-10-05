@@ -56,6 +56,7 @@ class History:
         self.buf = bytearray()  # recorded, not yet in the file
         self.pending = b""  # loaded for a drain in progress
         self.off = 0  # how much of pending has gone out
+        self.enabled = True  # Control Page pause: measured and shown, not held
         self.next_flush = time.ticks_add(time.ticks_ms(), FLUSH_MS)
 
         try:
@@ -74,7 +75,7 @@ class History:
     def record(self, stats):
         """Keep a landed batch. Skipped until the Clock has synced: no honest time before."""
 
-        if time.localtime()[0] < 2025:
+        if not self.enabled or time.localtime()[0] < 2025:
             return
 
         self.buf += pack(stats, int(time.time()))
@@ -154,6 +155,11 @@ if __name__ == "__main__":  # host self-check: python3 history.py
     for i in range(CHUNK + 2):
         h.record((i, 0, 0))
     assert h.count == CHUNK + 2 and h.on_disk == 0
+
+    h.enabled = False
+    h.record((1, 0, 0))
+    h.enabled = True
+    assert h.count == CHUNK + 2  # paused: not held
 
     h.flush()
     assert h.on_disk == CHUNK + 2 and not h.buf
