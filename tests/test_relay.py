@@ -1,7 +1,10 @@
-"""Self-check for Relay payload parsing. Run on host: python3 test_relay.py"""
+"""Self-check for Relay payload parsing. Run on host: python3 tests/test_relay.py"""
 
+import os
 import sys
 import types
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # relay.py lives at the repo root
 
 # Stub device-only modules so relay.py imports on a host Python.
 import time

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Sender: push a Message or LED to the Terminal through the Relay.
 #
-#   ./sender.sh message "hello"     ./sender.sh message ""     (clear)
-#   ./sender.sh led '#00ff00'       ./sender.sh led off
+#   mac/sender.sh message "hello"     mac/sender.sh message ""     (clear)
+#   mac/sender.sh led '#00ff00'       mac/sender.sh led off
 #
 # Topics: message -> bud/msg, led -> bud/led.
 #
@@ -24,7 +24,7 @@ set -euo pipefail
 : "${MQTT_USER:?set MQTT_USER in $BUDDY_SENDER_ENV}"
 : "${MQTT_PASS:?set MQTT_PASS in $BUDDY_SENDER_ENV}"
 
-CAFILE="$(cd "$(dirname "$0")" && pwd)/lib/isrg-root-x1.pem"
+CAFILE="$(cd "$(dirname "$0")/.." && pwd)/lib/isrg-root-x1.pem"
 
 case "${1:-}" in
   message) topic="bud/msg" ;;
