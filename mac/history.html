@@ -36,6 +36,7 @@ select{background:var(--bg);color:var(--ok);border:1px solid var(--line);padding
 <div class="row"><span id="range"></span><span class="lbl">every</span><select id="step"></select><span class="stat" id="stat"></span><button id="save">save PNG</button></div>
 <div class="row"><span class="lbl">clear last</span><span id="clear"><button data-h="1">1h</button> <button data-h="6">6h</button> <button data-h="24">24h</button> <button data-h="0">all</button></span></div>
 <p class="readout" id="readout">hover a chart for the values at that moment</p>
+<p class="readout" id="between"></p>
 <div class="card"><h2>round trip, ms (avg · jitter range) — gap = whole batch lost, Terminal off, or clock not yet synced</h2><canvas id="rtt"></canvas></div>
 <div class="card"><h2>loss %, rolling 15 echoes</h2><canvas id="loss"></canvas></div>
 <p class="legend" id="legend"></p>
@@ -57,16 +58,33 @@ const opts=()=>({animation:false,responsive:true,maintainAspectRatio:false,parsi
   scales:{x:{type:'linear',ticks:{color:css('--dim'),maxTicksLimit:8,callback:fmt},grid:{color:css('--line')}},
           y:{beginAtZero:true,ticks:{color:css('--dim')},grid:{color:css('--line')}}}});
 // crosshair: one vertical bar on both charts at the hovered time, values in #readout
-let hoverT=null,cur=[];
-Chart.register({id:'cross',afterDraw(c){
-  if(hoverT==null)return;const x=c.scales.x.getPixelForValue(hoverT),a=c.chartArea;
+// pins: click sets A, next click sets B, stats between them in #between; a third click starts over
+let hoverT=null,cur=[],pinA=null,pinB=null;
+function bar(c,t,dash){const x=c.scales.x.getPixelForValue(t),a=c.chartArea;
   if(x<a.left||x>a.right)return;
-  const g=c.ctx;g.save();g.strokeStyle=css('--ink');g.lineWidth=1;g.setLineDash([4,3]);
+  const g=c.ctx;g.save();g.strokeStyle=css('--ink');g.lineWidth=1;g.setLineDash(dash);
   g.beginPath();g.moveTo(x,a.top);g.lineTo(x,a.bottom);g.stroke();
   // time label over the axis ticks at the foot of the bar, kept inside the chart area
-  const t=fmt(hoverT);g.setLineDash([]);g.font='11px "JetBrains Mono",ui-monospace,monospace';g.textBaseline='top';
-  const w=g.measureText(t).width+8,lx=Math.min(Math.max(x-w/2,a.left),a.right-w);
-  g.fillStyle=css('--bg');g.fillRect(lx,a.bottom+2,w,15);g.fillStyle=css('--ink');g.fillText(t,lx+4,a.bottom+4);g.restore()}});
+  const l=fmt(t);g.setLineDash([]);g.font='11px "JetBrains Mono",ui-monospace,monospace';g.textBaseline='top';
+  const w=g.measureText(l).width+8,lx=Math.min(Math.max(x-w/2,a.left),a.right-w);
+  g.fillStyle=css('--bg');g.fillRect(lx,a.bottom+2,w,15);g.fillStyle=css('--ink');g.fillText(l,lx+4,a.bottom+4);g.restore()}
+Chart.register({id:'cross',afterDraw(c){
+  if(pinA!=null&&pinB!=null){const a=c.chartArea,px=t=>Math.min(Math.max(c.scales.x.getPixelForValue(t),a.left),a.right),x0=px(Math.min(pinA,pinB)),x1=px(Math.max(pinA,pinB));
+    const g=c.ctx;g.save();g.fillStyle=css('--ink')+'18';g.fillRect(x0,a.top,x1-x0,a.bottom-a.top);g.restore()}
+  if(pinA!=null)bar(c,pinA,[]);if(pinB!=null)bar(c,pinB,[]);
+  if(hoverT!=null)bar(c,hoverT,[4,3])}});
+const mean=(a,k)=>a.length?Math.round(a.reduce((s,r)=>s+r[k],0)/a.length):'–';
+const sum=v=>{const ok=v.filter(r=>r.avg_ms!=null);
+  return{n:v.length,avg:mean(ok,'avg_ms'),jit:mean(ok,'jitter_ms'),loss:mean(v,'loss_pct'),worst:ok.length?ok.reduce((m,r)=>r.avg_ms>m?r.avg_ms:m,0):'–',lost:v.length-ok.length}};
+const dur=ms=>ms<3600e3?Math.round(ms/6e4)+' min':(ms/3600e3).toFixed(1)+' h';
+function between(){
+  if(pinA==null){$('between').textContent='click a chart to pin a start, click again for the stats between the two';return}
+  if(pinB==null){$('between').innerHTML=`from <b>${new Date(pinA).toLocaleString()}</b> · click again to pin the end`;return}
+  const t0=Math.min(pinA,pinB),t1=Math.max(pinA,pinB)+step*1e3,s=sum(rows.filter(r=>r.t>=t0&&r.t<t1));
+  $('between').innerHTML=`<b>${new Date(t0).toLocaleString()}</b> – <b>${new Date(t1).toLocaleString()}</b> (${dur(t1-t0)}) · batches <b>${s.n}</b> · avg <b>${s.avg}</b> ms · jitter <b>${s.jit}</b> ms · loss <b>${s.loss}</b> % · worst <b>${s.worst}</b> ms · all-lost <b>${s.lost}</b>`}
+function pin(c,e){const r=nearest(c.scales.x.getValueForPixel(e.offsetX));if(!r)return;
+  if(pinA==null||pinB!=null){pinA=r.t;pinB=null}else pinB=r.t;
+  between();rtt.draw();loss.draw()}
 const nearest=t=>{let lo=0,hi=cur.length-1;if(hi<0)return null;
   while(lo<hi){const m=(lo+hi)>>1;cur[m].t<t?lo=m+1:hi=m}
   return lo>0&&t-cur[lo-1].t<cur[lo].t-t?cur[lo-1]:cur[lo]};
@@ -76,7 +94,7 @@ function hover(c,e){
     $('readout').innerHTML=`<b>${new Date(r.t).toLocaleString()}</b> · ${r.n} batch${r.n>1?'es':''} · `+(r.avg_ms==null?'<b>all lost</b>':`avg <b>${r.avg_ms}</b> ms · jitter <b>${r.jitter_ms}</b> ms`)+` · loss <b>${r.loss_pct}</b> %`}
   rtt.draw();loss.draw()}
 const mk=(id,sets)=>{const c=new Chart($(id),{type:'line',options:opts(),data:{datasets:sets}});
-  c.canvas.addEventListener('mousemove',e=>hover(c,e));c.canvas.addEventListener('mouseleave',()=>hover(c,null));return c};
+  c.canvas.addEventListener('mousemove',e=>hover(c,e));c.canvas.addEventListener('mouseleave',()=>hover(c,null));c.canvas.addEventListener('click',e=>pin(c,e));return c};
 const ds=(label,color,extra={})=>({label,borderColor:color,backgroundColor:color,borderWidth:1.5,pointRadius:0,spanGaps:false,data:[],...extra});
 const rtt=mk('rtt',[ds('avg',css('--ok')),ds('jitter',css('--warn'),{borderDash:[3,3]})]);
 const loss=mk('loss',[ds('loss %',css('--bad'),{stepped:true,fill:true,backgroundColor:css('--bad')+'22'})]);
@@ -105,14 +123,13 @@ function draw(){
   rtt.data.datasets[0].data=pts('avg_ms');rtt.data.datasets[1].data=pts('jitter_ms');loss.data.datasets[0].data=pts('loss_pct');
   spanMs=now-since;
   for(const c of [rtt,loss]){Object.assign(c.options.scales.x,{min:since,max:now});c.update()}
-  const ok=v.filter(r=>r.avg_ms!=null),mean=(a,k)=>a.length?Math.round(a.reduce((s,r)=>s+r[k],0)/a.length):'–';
-  const avg=mean(ok,'avg_ms'),worst=ok.length?ok.reduce((m,r)=>r.avg_ms>m?r.avg_ms:m,0):'–';
-  const lost=v.filter(r=>r.avg_ms==null).length;
-  $('stat').innerHTML=`<span>batches <b>${v.length}</b></span><span>worst <b>${worst}</b> ms</span><span>all-lost <b>${lost}</b></span>`;
+  const s=sum(v);
+  $('stat').innerHTML=`<span>batches <b>${s.n}</b></span><span>worst <b>${s.worst}</b> ms</span><span>all-lost <b>${s.lost}</b></span>`;
   const ml=cur.reduce((m,r)=>r.loss_pct>m.loss_pct?r:m,{loss_pct:0});lostT=ml.t??null;
-  legend=[[css('--ok'),'avg',avg,'ms'],[css('--warn'),'jitter',mean(ok,'jitter_ms'),'ms'],[css('--bad'),'loss',mean(v,'loss_pct'),'%'],
+  legend=[[css('--ok'),'avg',s.avg,'ms'],[css('--warn'),'jitter',s.jit,'ms'],[css('--bad'),'loss',s.loss,'%'],
     [null,'most lost',lostT==null?'–':new Date(lostT).toLocaleString(),lostT==null?'':`· ${ml.loss_pct} %`]];
   $('legend').innerHTML=legend.map(([c,a,b,d])=>`<span>${c?`<i class="sw" style="background:${c}"></i>`:''}${a} <b>${b}</b> ${d}</span>`).join('');
+  between();
 }
 // PNG: title, both charts, legend with the range's averages at the bottom
 function savePng(){
