@@ -134,7 +134,7 @@ footer p{margin:0;overflow-wrap:anywhere}
   <dl class="kv">
     <dt>link</dt><dd id="linkst">—</dd>
     <dt>relay</dt><dd id="relayst">—</dd>
-    <dt>mac</dt><dd id="macst">—</dd>
+    <dt>recorder</dt><dd id="recst">—</dd>
     <dt>topics</dt><dd id="topics">—</dd>
   </dl>
 </section>
@@ -202,7 +202,7 @@ function render(s){
   $('up').textContent=fmtUp(s.uptime_s);
   $('lednow').textContent=s.led||'off';
   const conn=(id,up)=>{const d=$(id);d.textContent=up?'up':'down';d.className=up?'up':'down'};
-  conn('linkst',!!l);conn('relayst',!!s.relay);conn('macst',!!s.mac);
+  conn('linkst',!!l);conn('relayst',!!s.relay);conn('recst',!!s.recorder);
   $('hist').textContent=(s.history||0)+' batches on-device'+(s.holding?'':' · paused');
   holding=!!s.holding;$('hold').textContent=holding?'pause holding':'resume holding';
   $('topics').textContent=(s.topics&&s.topics.length)?s.topics.join(' · '):'—';

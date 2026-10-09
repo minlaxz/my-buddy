@@ -44,8 +44,12 @@ What the Terminal sends back through the Relay the moment it shows a Message or 
 _Avoid_: ack, acknowledgement, confirmation, publish, outbound topic
 
 **History**:
-The record of past Ping batches, shown as a graph in a browser on the owner's Mac. The Terminal keeps every batch it measures (in memory, then flash) and shows how many it is holding on the Page and the Control Page. The moment the Mac's recorder is listening it hands them all over through the Relay and the count drops to zero; a button on the Control Page asks for the same by hand. Gaps in the graph are honest: Terminal off, or its clock not yet set.
+The record of past Ping batches, shown as a graph in a browser. The Recorder keeps it; the Terminal keeps every batch it measures (in memory, then flash) only until the Recorder is listening, and shows how many it is holding on the Page and the Control Page. With the Recorder always on, the Terminal holds only while it cannot reach the Relay, and hands everything over the moment it can; a button on the Control Page asks for the same by hand. Gaps in the graph are honest: Terminal off, or its clock not yet set.
 _Avoid_: telemetry, log, time series, dashboard, buffer, queue
+
+**Recorder**:
+The always-on service on a VPS that listens on the Relay for the Terminal's Ping batches, stores them and serves the History graph. Says it is listening through the Relay so the Terminal knows when to hand batches over. Not a Sender.
+_Avoid_: receiver, backend, server, the Mac (where it used to run)
 
 **Message**:
 Text pushed to the Terminal from the Control Page or by a Sender through the Relay. Drawn on the Page under the Wi-Fi Link and stays there until replaced or cleared; it never interrupts anything and never times out.

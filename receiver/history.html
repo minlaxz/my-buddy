@@ -21,8 +21,6 @@ canvas{width:100%!important;height:220px!important}
 .stat b{color:var(--ink);font-weight:600}
 .readout{min-height:1.4em;color:var(--dim);margin:0 0 8px}
 .readout b{color:var(--ink);font-weight:600}
-#clear button{color:var(--dim)}
-#clear button[data-armed]{color:var(--bad);border-color:var(--bad)}
 .lbl{color:var(--dim);margin:0 4px}
 #save{margin-left:auto}
 .legend{display:flex;gap:24px;color:var(--dim);margin:0}
@@ -34,7 +32,6 @@ select{background:var(--bg);color:var(--ok);border:1px solid var(--line);padding
 <h1>buddy · Ping history</h1>
 <p class="sub">batches (3 echoes to 8.8.8.8) averaged per interval, timestamped by the Terminal · refreshes every 30 s · rows older than 6 months are dropped</p>
 <div class="row"><span id="range"></span><span class="lbl">every</span><select id="step"></select><span class="stat" id="stat"></span><button id="save">save PNG</button></div>
-<div class="row"><span class="lbl">clear last</span><span id="clear"><button data-h="1">1h</button> <button data-h="6">6h</button> <button data-h="24">24h</button> <button data-h="0">all</button></span></div>
 <p class="readout" id="readout">hover a chart for the values at that moment</p>
 <p class="readout" id="between"></p>
 <div class="card"><h2>round trip, ms (avg · jitter range) — gap = whole batch lost, Terminal off, or clock not yet synced</h2><canvas id="rtt"></canvas></div>
@@ -153,9 +150,5 @@ function setRange(m){mins=m;const {s,d}=STEPS(m);step=d;
   $('step').innerHTML=s.map(x=>`<option value="${x}"${x===d?' selected':''}>${lbl(x)}</option>`).join('');draw()}
 $('range').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setRange(+b.dataset.m)});
 $('step').addEventListener('change',e=>{step=+e.target.value;draw()});
-$('clear').addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;
-  if(!b.dataset.armed){b.dataset.armed=1;b.textContent='again?';setTimeout(()=>{delete b.dataset.armed;b.textContent=b.dataset.h==='0'?'all':b.dataset.h+'h'},3000);return}
-  delete b.dataset.armed;b.textContent=b.dataset.h==='0'?'all':b.dataset.h+'h';
-  const r=await fetch('/clear?hours='+b.dataset.h,{method:'POST'});$('readout').textContent='cleared · '+await r.text();load()});
 setRange(mins);load();setInterval(load,30e3);
 </script>

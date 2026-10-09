@@ -54,10 +54,10 @@ r.publish(TOPIC_LED + b"/ack", b"2")
 r.poll()
 assert sent == [(TOPIC_PING, b"1"), (TOPIC_LED + b"/ack", b"2")] and r.pending == []
 
-# bud/history flips mac_listening and earns no Receipt.
+# bud/history flips recorder_listening and earns no Receipt.
 r._on_publish(TOPIC_HISTORY, b"on")
-assert r.mac_listening and r.pending == []
+assert r.recorder_listening and r.pending == []
 r._on_publish(TOPIC_HISTORY, b"off")
-assert not r.mac_listening
+assert not r.recorder_listening
 
 print("ok")

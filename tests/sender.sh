@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Sender: push a Message or LED to the Terminal through the Relay.
 #
-#   mac/sender.sh message "hello"     mac/sender.sh message ""     (clear)
-#   mac/sender.sh led '#00ff00'       mac/sender.sh led off
+#   tests/sender.sh message "hello"     tests/sender.sh message ""     (clear)
+#   tests/sender.sh led '#00ff00'       tests/sender.sh led off
 #
 # Topics: message -> bud/msg, led -> bud/led.
 #

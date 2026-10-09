@@ -99,7 +99,7 @@ def status():
         "ping": pinger.stats,
         "history": history.count,
         "holding": history.enabled,
-        "mac": relay.mac_listening,
+        "recorder": relay.recorder_listening,
     }
 
 
@@ -108,8 +108,8 @@ def push():
 
     if relay.client is None:
         return False, "Relay down"
-    if not relay.mac_listening:
-        return False, "Mac not listening"
+    if not relay.recorder_listening:
+        return False, "Recorder not listening"
     if not history.count:
         return True, "Nothing to push"
     return True, "Pushing {}".format(history.count)
@@ -233,12 +233,12 @@ while True:
         next_animation = now
 
     # --------------------------------------------------------------
-    # History: drain one chunk per tick while the Mac is listening.
+    # History: drain one chunk per tick while the recorder is listening.
     # A chunk already handed to the socket when the Relay drops is
     # lost (<= CHUNK records); the rest goes back to the store.
     # --------------------------------------------------------------
 
-    if relay.client and relay.mac_listening:
+    if relay.client and relay.recorder_listening:
         if history.count and not relay.pending:
             relay.publish(TOPIC_PING, history.next_chunk())
     elif history.pending:

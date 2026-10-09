@@ -1,0 +1,31 @@
+name: my-buddy
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  my-buddy-cf:
+    image: cloudflare/cloudflared:2026.7.3
+    command: tunnel run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN:?}
+    restart: unless-stopped
+    logging:
+      <<: *default-logging
+
+  # Recorder. No published port: point the tunnel's public hostname at
+  # http://my-buddy-receiver:8000.
+  my-buddy-receiver:
+    image: ghcr.io/minlaxz/buddy-receiver:latest
+    environment:
+      MQTT_HOST: ${MQTT_HOST:?}
+      MQTT_USER: ${MQTT_USER:?}
+      MQTT_PASS: ${MQTT_PASS:?}
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+    logging:
+      <<: *default-logging

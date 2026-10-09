@@ -110,7 +110,7 @@ def json_status(status):
 
     return (
         '{{"link":{},"ping":{},"uptime_s":{},"led":{},"relay":{},"topics":[{}],'
-        '"history":{},"holding":{},"mac":{}}}'
+        '"history":{},"holding":{},"recorder":{}}}'
     ).format(
         link_json,
         ping_json(status.get("ping")),
@@ -120,7 +120,7 @@ def json_status(status):
         topics,
         status.get("history", 0),
         "true" if status.get("holding") else "false",
-        "true" if status.get("mac") else "false",
+        "true" if status.get("recorder") else "false",
     )
 
 

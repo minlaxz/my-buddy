@@ -1,8 +1,8 @@
-"""History: Ping batches kept on the Terminal until the Mac is listening.
+"""History: Ping batches kept on the Terminal until the recorder is listening.
 
 Every landed batch becomes a 9-byte record in RAM; records are appended to
 FILE every FLUSH_MS, so a power cut loses at most that much. The main loop
-drains them over the Relay, CHUNK records per publish, while the Mac's
+drains them over the Relay, CHUNK records per publish, while the
 recorder says it is listening (retained bud/history = on).
 
 ponytail: a drain loads the whole backlog into RAM (8 MB PSRAM; a week is
@@ -21,7 +21,7 @@ FLUSH_MS = 5 * 60_000
 CHUNK = 50  # records per publish, ~1.1 KB of JSON
 MAX_RECORDS = 7 * 24 * 1200  # a week at a batch every 3 s
 
-# MicroPython on ESP32 counts seconds from 2000-01-01; the Mac wants 1970.
+# MicroPython on ESP32 counts seconds from 2000-01-01; the recorder wants 1970.
 EPOCH_OFFSET = 946_684_800 if time.gmtime(0)[0] == 2000 else 0
 
 

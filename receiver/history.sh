@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # History: record Ping batches from the Terminal and serve the graph.
 #
-#   mac/history.sh         record to ~/.local/share/buddy/ping.jsonl and
+#   receiver/history.sh    record to ~/.local/share/buddy/ping.jsonl and
 #                           serve http://localhost:8000 until Ctrl-C
 #
-# Credentials: the same ~/.config/buddy/sender.env as mac/sender.sh.
+# Credentials: MQTT_HOST/USER/PASS from the environment, or the same
+# ~/.config/buddy/sender.env as tests/sender.sh. In the Docker image the data
+# dir is /data and the server listens on 0.0.0.0 (see Dockerfile).
+#
+# One recorder at a time: the fixed client id means a second copy (the Mac
+# while the VPS runs) kicks the first off, and they take turns every 5 s.
 #
 # While this runs, retained bud/history = on tells the Terminal the Mac is
 # listening; it then drains every batch it has held (RAM + flash) in chunks
@@ -18,9 +23,9 @@
 # One JSON line per chunk, rows timestamped by the Terminal (unix s):
 #   {"tst":"...","topic":"bud/ping",...,"payload":[[1759600000,12,0,3],...]}
 #
-# The page's "clear" buttons POST /clear to history_server.py, which rewrites
-# the file in place without the chosen range. Rows older than 6 months are
-# dropped at start and once a day.
+# history_server.py drops rows older than 6 months at start and once a day.
+# Older JSONL (e.g. from the Mac) can be appended to ping.jsonl at any time;
+# the page sorts by timestamp.
 
 set -euo pipefail
 
@@ -33,15 +38,17 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 DATA="${BUDDY_HISTORY_DIR:-$HOME/.local/share/buddy}"
 PORT="${BUDDY_HISTORY_PORT:-8000}"
+BIND="${BUDDY_HISTORY_BIND:-127.0.0.1}"
+CAFILE="${MQTT_CAFILE:-$HERE/../lib/isrg-root-x1.pem}"
 mkdir -p "$DATA"
 ln -sf "$HERE/history.html" "$DATA/index.html"
 
-MQ=(-h "$MQTT_HOST" -p 8883 --cafile "$HERE/../lib/isrg-root-x1.pem" -u "$MQTT_USER" -P "$MQTT_PASS")
+MQ=(-h "$MQTT_HOST" -p 8883 --cafile "$CAFILE" -u "$MQTT_USER" -P "$MQTT_PASS")
 
 # Fixed client id: a second copy of this script kicks the first off the broker.
 SUB_ARGS=(-i buddy-history -t bud/ping -F %J --will-topic bud/history --will-payload off --will-retain)
 
-python3 "$HERE/history_server.py" "$DATA" "$PORT" &
+python3 "$HERE/history_server.py" "$DATA" "$PORT" "$BIND" &
 SRV=$!
 SUB=
 # Shutdown relies on the will: a dead socket fires it, a DISCONNECT does not.
@@ -52,7 +59,7 @@ trap '{ kill -9 $SUB; kill $SRV; } 2>/dev/null || true' EXIT
 trap 'exit 130' INT TERM HUP
 
 echo "recording bud/ping -> $DATA/ping.jsonl"
-echo "graph: http://localhost:$PORT"
+echo "graph: http://$BIND:$PORT"
 
 while kill -0 $SRV 2>/dev/null; do
   python3 -c 'import os, sys; os.setpgrp(); os.execvp(sys.argv[1], sys.argv[1:])' \
