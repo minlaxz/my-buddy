@@ -21,13 +21,13 @@ MQTT_USER=sender
 MQTT_PASS=...
 ```
 
-then `docker compose up -d`. In the tunnel, point the public hostname at `http://my-buddy-receiver:8000`. History lands in `./data/ping.jsonl`.
+then `docker compose up -d`. In the tunnel, point the public hostname at `http://my-buddy-receiver:8000`. History lands in `./data/ping.db` (SQLite).
 
-Bring over the History the Mac already recorded. Append, never overwrite: the recorder holds `ping.jsonl` open, and the page sorts rows by timestamp, so order does not matter. Safe before or after the stack starts.
+Bring in an old JSONL (the Mac's, or the VPS's own from before SQLite). Rows already stored are skipped, so it is safe to run twice, and safe while the Recorder runs:
 
 ```sh
-scp ~/.local/share/buddy/ping.jsonl vps:/tmp/mac-ping.jsonl
-ssh vps 'mkdir -p ~/my-buddy/data && cat /tmp/mac-ping.jsonl >> ~/my-buddy/data/ping.jsonl && rm /tmp/mac-ping.jsonl'
+docker compose exec my-buddy-receiver python3 /app/receiver/ingest.py /data/ping.db /data/ping.jsonl
+mv data/ping.jsonl data/ping.jsonl.bak   # delete once the graph looks right
 ```
 
-The page is read-only (no clear buttons); rows older than six months are dropped automatically.
+The page loads only the Range it shows: from a date and hour to another (or to now), today from midnight by default. It is read-only (no clear buttons); rows older than six months are dropped automatically.

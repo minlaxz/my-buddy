@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # History: record Ping batches from the Terminal and serve the graph.
 #
-#   receiver/history.sh    record to ~/.local/share/buddy/ping.jsonl and
+#   receiver/history.sh    record to ~/.local/share/buddy/ping.db and
 #                           serve http://localhost:8000 until Ctrl-C
 #
 # Credentials: MQTT_HOST/USER/PASS from the environment, or the same
@@ -20,12 +20,13 @@
 # mosquitto_sub does not reconnect: when the broker drops it ("Error: The
 # connection was lost") this script starts a new one and raises the flag again.
 #
-# One JSON line per chunk, rows timestamped by the Terminal (unix s):
+# One JSON line per chunk, rows timestamped by the Terminal (unix s), piped
+# into ingest.py, which stores each row in ping.db (SQLite) once:
 #   {"tst":"...","topic":"bud/ping",...,"payload":[[1759600000,12,0,3],...]}
 #
 # history_server.py drops rows older than 6 months at start and once a day.
-# Older JSONL (e.g. from the Mac) can be appended to ping.jsonl at any time;
-# the page sorts by timestamp.
+# An old JSONL (e.g. from the Mac) goes in with ingest.py at any time, even
+# while this runs: python3 ingest.py ping.db old.jsonl
 
 set -euo pipefail
 
@@ -58,12 +59,14 @@ SUB=
 trap '{ kill -9 $SUB; kill $SRV; } 2>/dev/null || true' EXIT
 trap 'exit 130' INT TERM HUP
 
-echo "recording bud/ping -> $DATA/ping.jsonl"
+echo "recording bud/ping -> $DATA/ping.db"
 echo "graph: http://$BIND:$PORT"
 
 while kill -0 $SRV 2>/dev/null; do
+  # Process substitution, not a pipe: $! stays mosquitto_sub's pid for the
+  # kill -9, and ingest.py ends on its own at EOF when mosquitto_sub dies.
   python3 -c 'import os, sys; os.setpgrp(); os.execvp(sys.argv[1], sys.argv[1:])' \
-    mosquitto_sub "${MQ[@]}" "${SUB_ARGS[@]}" >>"$DATA/ping.jsonl" &
+    mosquitto_sub "${MQ[@]}" "${SUB_ARGS[@]}" > >(python3 "$HERE/ingest.py" "$DATA/ping.db") &
   SUB=$!
   sleep 0.5  # subscribed before the flag goes up, so the first chunk is not missed
   mosquitto_pub "${MQ[@]}" -r -t bud/history -m on || true

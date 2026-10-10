@@ -47,6 +47,10 @@ _Avoid_: ack, acknowledgement, confirmation, publish, outbound topic
 The record of past Ping batches, shown as a graph in a browser. The Recorder keeps it; the Terminal keeps every batch it measures (in memory, then flash) only until the Recorder is listening, and shows how many it is holding on the Page and the Control Page. With the Recorder always on, the Terminal holds only while it cannot reach the Relay, and hands everything over the moment it can; a button on the Control Page asks for the same by hand. Gaps in the graph are honest: Terminal off, or its clock not yet set.
 _Avoid_: telemetry, log, time series, dashboard, buffer, queue
 
+**Range**:
+The stretch of History the graph shows: from a date and hour, to another date and hour (not included) or to now. Defaults to today from midnight to now, in the viewer's local time. While it runs to now it keeps moving forward; a Range in the past stays put. Only the Range is loaded, never all of History.
+_Avoid_: window, period, span, filter
+
 **Recorder**:
 The always-on service on a VPS that listens on the Relay for the Terminal's Ping batches, stores them and serves the History graph. Says it is listening through the Relay so the Terminal knows when to hand batches over. Not a Sender.
 _Avoid_: receiver, backend, server, the Mac (where it used to run)
